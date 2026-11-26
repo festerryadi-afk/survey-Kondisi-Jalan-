@@ -87,7 +87,7 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "revision": "fc53d37e606573b811d9d132c9fb1b92"
   }, {
     "url": "index.html",
-    "revision": "7a1e85276d3d110fff483d460ae3b9dc"
+    "revision": "c133c6564a13eb3784ec1933953be2bc"
   }, {
     "url": "icon.svg",
     "revision": "b9460ebbb18f0aaa7c78883cab96d8bb"
@@ -98,34 +98,46 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "url": "apple-touch-icon.png",
     "revision": "51e79a7ebc2e6a6ffac60474dba7fd33"
   }, {
-    "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
+    "url": "assets/workbox-window.prod.es5-zd_v-k4h.js",
     "revision": null
   }, {
-    "url": "assets/purify.es-Dzkdzyfv.js",
+    "url": "assets/purify.es-DnChzBFM.js",
     "revision": null
   }, {
-    "url": "assets/photoEncodeWorker-Bb0qHEzQ.js",
+    "url": "assets/photoEncodeWorker-rniLbTPe.js",
     "revision": null
   }, {
-    "url": "assets/jspdf.es.min-F4tjNfXC.js",
+    "url": "assets/jspdf.es.min-DkBHoFP3.js",
     "revision": null
   }, {
-    "url": "assets/index.es-DtKiSV_q.js",
+    "url": "assets/index.es-CcBSr1b4.js",
     "revision": null
   }, {
-    "url": "assets/index-DHMv431W.css",
+    "url": "assets/index-DBRiX9QO.css",
     "revision": null
   }, {
-    "url": "assets/index-C9bFornG.js",
+    "url": "assets/index-BwGpHDF8.js",
     "revision": null
   }, {
-    "url": "assets/html2canvas-Bykoi3kn.js",
+    "url": "assets/html2canvas-S3TcrMGq.js",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/image_f57fd2d7.png",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/image_ee5722ca.png",
     "revision": null
   }, {
     "url": "assets/aistudio/image_bbd1009c.png",
     "revision": null
   }, {
+    "url": "assets/aistudio/image_90a963ef.png",
+    "revision": null
+  }, {
     "url": "assets/aistudio/image_70e4eae5.png",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/Screenshot_20261126_150609_8f04399b.jpg",
     "revision": null
   }, {
     "url": "assets/aistudio/Logo_Mentawai_5ae4cefd.jpg",

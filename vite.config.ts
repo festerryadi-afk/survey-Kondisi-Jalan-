@@ -3,12 +3,14 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+import {androidLegacyCssPlugin} from './scripts/androidLegacyCssPlugin.ts';
 
 export default defineConfig(() => {
   return {
     plugins: [
       react(),
       tailwindcss(),
+      androidLegacyCssPlugin(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
@@ -67,6 +69,8 @@ export default defineConfig(() => {
       }),
     ],
     build: {
+      target: 'chrome64',
+      cssTarget: 'chrome64',
       chunkSizeWarningLimit: 3000,
     },
     resolve: {

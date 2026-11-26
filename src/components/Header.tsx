@@ -170,15 +170,18 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Penyimpanan</span>
           </button>
 
-          {/* Download / Pasang APK Siap Pakai Button */}
-          <button
-            onClick={onOpenApkModal}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-sm transition cursor-pointer"
-            title="Download File APK Siap Pakai & Pasang di HP Android"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span className="font-bold">Download APK</span>
-          </button>
+          {/* Download / Pasang APK Siap Pakai Button (disembunyikan jika sudah dibuka di dalam APK Android) */}
+          {typeof window !== 'undefined' &&
+            !(window as Window & { MentawaiAndroidDownloader?: unknown }).MentawaiAndroidDownloader && (
+              <button
+                onClick={onOpenApkModal}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-sm transition cursor-pointer"
+                title="Download File APK Siap Pakai & Pasang di HP Android"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span className="font-bold">Download APK</span>
+              </button>
+            )}
 
           {/* Push Notification Drawer Trigger */}
           <button
