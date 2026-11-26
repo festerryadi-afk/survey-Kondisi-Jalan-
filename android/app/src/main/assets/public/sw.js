@@ -87,7 +87,7 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "revision": "fc53d37e606573b811d9d132c9fb1b92"
   }, {
     "url": "index.html",
-    "revision": "e3f941ed9d1426c58f75d8c766e8c183"
+    "revision": "41ec64dfeba6cdeef63e849d3d409f4e"
   }, {
     "url": "icon.svg",
     "revision": "b9460ebbb18f0aaa7c78883cab96d8bb"
@@ -107,19 +107,19 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "url": "assets/photoEncodeWorker-rniLbTPe.js",
     "revision": null
   }, {
-    "url": "assets/jspdf.es.min-BrRNBjCy.js",
+    "url": "assets/jspdf.es.min-_6q3-2kX.js",
     "revision": null
   }, {
-    "url": "assets/index.es-BosXelNH.js",
+    "url": "assets/index.es-BCiEpM30.js",
     "revision": null
   }, {
-    "url": "assets/index-DEg37d-k.js",
+    "url": "assets/index-g4PYjDeL.js",
     "revision": null
   }, {
-    "url": "assets/index-CRxriNV0.css",
+    "url": "assets/index-DcE4VueA.css",
     "revision": null
   }, {
-    "url": "assets/html2canvas-DXWSJjJi.js",
+    "url": "assets/html2canvas-BEdR1auS.js",
     "revision": null
   }, {
     "url": "assets/aistudio/image_f57fd2d7.png",

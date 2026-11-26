@@ -3,7 +3,6 @@ import L from 'leaflet';
 import { 
   Download, 
   Navigation, 
-  Layers, 
   MapPin, 
   FileSpreadsheet, 
   FileCode, 
@@ -677,23 +676,23 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
   return (
     <div className="flex flex-col flex-1 h-auto min-h-[calc(100vh-116px)] md:h-[calc(100vh-116px)] bg-slate-950 text-slate-100 overflow-y-auto md:overflow-hidden">
-      {/* Compact Proportional Toolbar */}
-      <div className="bg-slate-900 border-b border-slate-800 px-2.5 sm:px-4 py-1.5 sm:py-2 shrink-0 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+      {/* Compact Proportional Single-Line Toolbar */}
+      <div className="bg-slate-900 border-b border-slate-800 px-2 py-1 shrink-0 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-nowrap items-center justify-between gap-1.5 overflow-x-auto whitespace-nowrap">
           {/* Refined and compact proportional title frame */}
-          <div className="flex items-center gap-2 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md border border-slate-700/80">
-            <Compass className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-slate-100 tracking-wide">
+          <div className="flex items-center gap-1.5 bg-slate-950/70 px-2 py-0.5 rounded border border-slate-700/80 shrink-0 whitespace-nowrap">
+            <Compass className="w-3 h-3 text-amber-400 shrink-0" />
+            <span className="font-bold text-[10px] text-slate-100 tracking-tight whitespace-nowrap">
               Peta Ruas Jalan Kab. Kep. Mentawai
             </span>
             <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${
+              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border flex items-center gap-1 whitespace-nowrap shrink-0 ${
                 tileStatus === 'active' || tileStatus === 'fallback'
                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
                   : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
               }`}
             >
-              <Globe className="w-3 h-3" />
+              <Globe className="w-2.5 h-2.5 shrink-0" />
               <span>
                 {activeTileLayer === 'satellite'
                   ? 'Satelit Aktif'
@@ -704,14 +703,14 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
             </span>
           </div>
 
-          {/* Map Layer Switcher & Condition Filter */}
-          <div className="flex items-center flex-wrap gap-2 text-xs">
+          {/* Map Layer Switcher & Condition Filter (1 single horizontal line) */}
+          <div className="flex items-center flex-nowrap gap-1 text-[10px] shrink-0 whitespace-nowrap">
             {/* Tile Layer Selector */}
-            <div className="flex items-center rounded-md bg-slate-800 p-0.5 border border-slate-700">
+            <div className="flex items-center flex-nowrap rounded bg-slate-800 p-0.5 border border-slate-700 shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTileLayer('streets')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap transition cursor-pointer ${
                   activeTileLayer === 'streets'
                     ? 'bg-amber-500 text-slate-950 font-bold'
                     : 'text-slate-300 hover:text-white'
@@ -722,7 +721,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTileLayer('satellite')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap transition cursor-pointer ${
                   activeTileLayer === 'satellite'
                     ? 'bg-amber-500 text-slate-950 font-bold'
                     : 'text-slate-300 hover:text-white'
@@ -733,7 +732,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTileLayer('terrain')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap transition cursor-pointer ${
                   activeTileLayer === 'terrain'
                     ? 'bg-amber-500 text-slate-950 font-bold'
                     : 'text-slate-300 hover:text-white'
@@ -743,13 +742,13 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
               </button>
             </div>
 
-            {/* Condition Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
+            {/* Condition Filter + Color Editor */}
+            <div className="flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700 shrink-0 whitespace-nowrap">
+              <Filter className="w-3 h-3 text-slate-400 shrink-0" />
               <select
                 value={filterCondition}
                 onChange={(e) => setFilterCondition(e.target.value)}
-                className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent text-slate-200 text-[10px] focus:outline-none cursor-pointer whitespace-nowrap"
               >
                 <option value="all" className="bg-slate-800">Semua Kondisi</option>
                 <option value="Baik" className="bg-slate-800">Kondisi Baik</option>
@@ -757,39 +756,47 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 <option value="Rusak Ringan" className="bg-slate-800">Rusak Ringan</option>
                 <option value="Rusak Berat" className="bg-slate-800">Rusak Berat</option>
               </select>
+              <button
+                type="button"
+                onClick={() => setColorEditTarget({ type: 'legend' })}
+                title="Edit Warna Kondisi Jalan"
+                className="text-amber-400 hover:text-amber-300 pl-1 border-l border-slate-700 cursor-pointer shrink-0"
+              >
+                <Palette className="w-3 h-3" />
+              </button>
             </div>
 
             {/* Toggle Survey Point Markers */}
-            <label className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700 cursor-pointer">
+            <label className="flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700 cursor-pointer shrink-0 whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={showSurveyPoints}
                 onChange={(e) => setShowSurveyPoints(e.target.checked)}
-                className="accent-amber-500 rounded"
+                className="accent-amber-500 rounded w-3 h-3"
               />
-              <span className="text-slate-300 text-xs">Titik Foto ({photos.length})</span>
+              <span className="text-slate-300 text-[10px] whitespace-nowrap">Titik Foto ({photos.length})</span>
             </label>
 
             {/* Toggle GPS Route Tracker Layer */}
-            <label className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-md border border-cyan-500/40 cursor-pointer">
+            <label className="flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.5 rounded border border-cyan-500/40 cursor-pointer shrink-0 whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={showGpsTracks}
                 onChange={(e) => setShowGpsTracks(e.target.checked)}
-                className="accent-cyan-400 rounded"
+                className="accent-cyan-400 rounded w-3 h-3"
               />
-              <span className="text-cyan-300 text-xs">Jalur GPS ({trackedRoadsCount})</span>
+              <span className="text-cyan-300 text-[10px] whitespace-nowrap">Jalur GPS ({trackedRoadsCount})</span>
             </label>
 
-            {/* GIS Import & Export Buttons Group */}
-            <div className="flex items-center flex-wrap gap-1.5">
+            {/* GIS Import & Export Buttons Group (single horizontal line) */}
+            <div className="flex items-center flex-nowrap gap-1 shrink-0 whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setIsKmlImportModalOpen(true)}
                 title="Impor file *.KML atau *.KMZ agar tersimpan dan tampil pada peta"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition shadow cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] whitespace-nowrap transition shadow cursor-pointer shrink-0"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="w-3 h-3 shrink-0" />
                 <span>Impor KML/KMZ</span>
               </button>
 
@@ -797,9 +804,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportKML}
                 title="Ekspor data jalur dan titik survei ke KML untuk Google Earth, QGIS, ArcGIS"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-200 font-semibold transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-200 font-semibold text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <FileCode className="w-3.5 h-3.5 text-sky-400" />
+                <FileCode className="w-3 h-3 text-sky-400 shrink-0" />
                 <span>KML Spasial</span>
               </button>
 
@@ -807,9 +814,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportGpsTrackerKML}
                 title="Ekspor jalur hasil GPS Tracker (100m + STA Akhir) ke file KML"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-200 font-semibold transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-200 font-semibold text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <Route className="w-3.5 h-3.5 text-cyan-400" />
+                <Route className="w-3 h-3 text-cyan-400 shrink-0" />
                 <span>Tracker KML</span>
               </button>
 
@@ -817,9 +824,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportGpsTrackerKMZ}
                 title="Ekspor jalur hasil GPS Tracker (100m + STA Akhir) ke file KMZ"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-200 font-semibold transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-200 font-semibold text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <Route className="w-3.5 h-3.5 text-indigo-400" />
+                <Route className="w-3 h-3 text-indigo-400 shrink-0" />
                 <span>Tracker KMZ</span>
               </button>
 
@@ -827,9 +834,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportGpsTrackerExcel}
                 title="Ekspor hasil GPS Tracker (100m + STA Akhir) ke Excel (.xlsx)"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <FileSpreadsheet className="w-3 h-3 text-emerald-400 shrink-0" />
                 <span>Tracker Excel</span>
               </button>
 
@@ -837,9 +844,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportCSV}
                 title="Ekspor inventaris titik survei ke CSV"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <Download className="w-3 h-3 text-emerald-400 shrink-0" />
                 <span>CSV</span>
               </button>
 
@@ -847,9 +854,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 type="button"
                 onClick={handleExportExcel}
                 title="Ekspor laporan survei jalan lengkap (.XLS)"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition cursor-pointer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-[10px] whitespace-nowrap transition cursor-pointer shrink-0"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
+                <FileSpreadsheet className="w-3 h-3 text-amber-400 shrink-0" />
                 <span>Laporan XLS</span>
               </button>
             </div>
@@ -858,15 +865,15 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       </div>
 
       {/* Mobile Switcher (Tampilan Peta / Daftar Ruas) untuk Device Mobile */}
-      <div className="md:hidden flex items-center justify-center p-2 bg-slate-950 border-b border-slate-800 shrink-0">
-        <div className="flex w-full max-w-sm items-center bg-slate-800/90 p-0.5 rounded-lg border border-slate-700">
+      <div className="md:hidden flex items-center justify-center px-2 py-1 bg-slate-950 border-b border-slate-800 shrink-0">
+        <div className="flex w-full max-w-sm items-center flex-nowrap bg-slate-800/90 p-0.5 rounded border border-slate-700">
           <button
             type="button"
             onClick={() => {
               setMobileTab('map');
               setTimeout(() => mapInstanceRef.current?.invalidateSize({ animate: false }), 120);
             }}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+            className={`flex-1 py-1 text-[10px] font-bold whitespace-nowrap rounded transition cursor-pointer ${
               mobileTab === 'map'
                 ? 'bg-amber-500 text-slate-950 shadow'
                 : 'text-slate-300 hover:text-white'
@@ -877,7 +884,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
           <button
             type="button"
             onClick={() => setMobileTab('list')}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+            className={`flex-1 py-1 text-[10px] font-bold whitespace-nowrap rounded transition cursor-pointer ${
               mobileTab === 'list'
                 ? 'bg-amber-500 text-slate-950 shadow'
                 : 'text-slate-300 hover:text-white'
@@ -892,12 +899,12 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       <div className="flex-1 min-h-[360px] md:min-h-0 flex overflow-hidden relative">
         {/* Left Side: Ruas Selector & Detail Panel */}
         <div className={`${mobileTab === 'list' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 bg-slate-900/95 border-r border-slate-800 flex-col shrink-0 z-10 overflow-hidden`}>
-          <div className="p-3 border-b border-slate-800 bg-slate-950/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <div className="px-2.5 py-1.5 border-b border-slate-800 bg-slate-950/40">
+            <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide whitespace-nowrap truncate">
                 Daftar Ruas Jalan Mentawai
               </span>
-              <span className="text-xs text-amber-400 font-semibold">
+              <span className="text-[10px] text-amber-400 font-semibold whitespace-nowrap shrink-0">
                 {ruasList.length} Ruas
               </span>
             </div>
@@ -905,83 +912,81 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
           {/* Saved Imported KML / KMZ Map Layers */}
           {kmlLayers.length > 0 && (
-            <div className="p-2.5 border-b border-slate-800 bg-slate-950/60 space-y-2 shrink-0">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-sky-300 flex items-center gap-1.5">
-                  <FileCode className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Layer KML / KMZ Tersimpan ({kmlLayers.length})</span>
+            <div className="p-2 border-b border-slate-800 bg-slate-950/60 space-y-1.5 shrink-0">
+              <div className="flex items-center justify-between text-[10px] whitespace-nowrap">
+                <span className="font-bold text-sky-300 flex items-center gap-1 whitespace-nowrap truncate">
+                  <FileCode className="w-3 h-3 text-sky-400 shrink-0" />
+                  <span>Layer KML / KMZ ({kmlLayers.length})</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsKmlImportModalOpen(true)}
-                  className="text-[10px] font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
+                  className="text-[9px] font-bold text-amber-400 hover:text-amber-300 whitespace-nowrap cursor-pointer shrink-0"
                 >
                   + Impor
                 </button>
               </div>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
+              <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
                 {kmlLayers.map((layer) => (
                   <div
                     key={layer.id}
-                    className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px]"
+                    className="flex items-center justify-between gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] whitespace-nowrap"
                   >
                     <button
                       type="button"
                       onClick={() => handleZoomToKmlLayer(layer)}
-                      className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer"
+                      className="flex items-center gap-1.5 min-w-0 flex-1 text-left cursor-pointer whitespace-nowrap"
                       title="Pusatkan peta ke layer ini"
                     >
                       <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/40"
+                        className="w-2 h-2 rounded-full shrink-0 border border-white/40"
                         style={{ backgroundColor: layer.color }}
                       />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-white truncate">
-                          {layer.name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate">
-                          {layer.fileType} • {layer.features.length} objek
-                          {layer.totalLengthKm > 0 ? ` • ${layer.totalLengthKm} km` : ''}
-                        </div>
-                      </div>
+                      <span className="font-semibold text-white text-[10px] truncate whitespace-nowrap">
+                        {layer.name}
+                      </span>
+                      <span className="text-[9px] text-slate-400 whitespace-nowrap shrink-0">
+                        • {layer.fileType} ({layer.features.length})
+                        {layer.totalLengthKm > 0 ? ` • ${layer.totalLengthKm} km` : ''}
+                      </span>
                     </button>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setColorEditTarget({ type: 'kml', layer })}
-                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 cursor-pointer"
+                        className="p-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 cursor-pointer"
                         title="Edit Warna Layer KML/KMZ"
                       >
-                        <Palette className="w-3 h-3" />
+                        <Palette className="w-2.5 h-2.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onToggleKmlLayer(layer.id)}
-                        className={`p-1 rounded border transition cursor-pointer ${
+                        className={`p-0.5 rounded border transition cursor-pointer ${
                           layer.visible
                             ? 'bg-sky-950/80 border-sky-500/40 text-sky-300'
                             : 'bg-slate-800 border-slate-700 text-slate-500'
                         }`}
                         title={layer.visible ? 'Sembunyikan di peta' : 'Tampilkan di peta'}
                       >
-                        {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleZoomToKmlLayer(layer)}
-                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 cursor-pointer"
+                        className="p-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 cursor-pointer"
                         title="Fokus ke Layer"
                       >
-                        <Maximize className="w-3 h-3" />
+                        <Maximize className="w-2.5 h-2.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onDeleteKmlLayer(layer.id)}
-                        className="p-1 rounded bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-400 cursor-pointer"
+                        className="p-0.5 rounded bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-400 cursor-pointer"
                         title="Hapus Layer KML/KMZ"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-2.5 h-2.5" />
                       </button>
                     </div>
                   </div>
@@ -991,7 +996,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
           )}
 
           {/* List of road segments */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-1.5 space-y-1">
             {ruasList.map((ruas) => {
               const segments = getRuasSTASegments(ruas);
               const isSelected = ruas.id === selectedRuasId;
@@ -1002,75 +1007,73 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 <div
                   key={ruas.id}
                   onClick={() => handleZoomToRuas(ruas)}
-                  className={`p-3 rounded-lg cursor-pointer transition ${
+                  className={`p-2 rounded-lg cursor-pointer transition ${
                     isSelected
                       ? 'bg-slate-800 border border-amber-500/60 shadow-md'
                       : 'hover:bg-slate-800/60 border border-transparent'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setColorEditTarget({ type: 'ruas', ruas });
-                          }}
-                          className="w-3 h-3 rounded-full border border-white/50 shrink-0 cursor-pointer hover:scale-125 transition"
-                          style={{
-                            backgroundColor:
-                              ruas.customColor ||
-                              (segments[0]
-                                ? conditionColors[segments[0].kondisiJalan]
-                                : '#64748b'),
-                          }}
-                          title={
-                            ruas.customColor
-                              ? `Warna Kustom (${ruas.customColor}) - Klik untuk edit`
-                              : 'Warna otomatis kondisi STA - Klik untuk edit'
-                          }
-                        />
-                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                          {ruas.nomorRuas}
-                        </span>
-                        <h4 className="font-semibold text-xs text-white leading-tight">
-                          {ruas.namaRuas}
-                        </h4>
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        {ruas.kecamatanPulau}
-                      </p>
+                  <div className="flex items-center justify-between gap-1.5 whitespace-nowrap">
+                    <div className="flex items-center gap-1 min-w-0 flex-1 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setColorEditTarget({ type: 'ruas', ruas });
+                        }}
+                        className="w-2.5 h-2.5 rounded-full border border-white/50 shrink-0 cursor-pointer hover:scale-125 transition"
+                        style={{
+                          backgroundColor:
+                            ruas.customColor ||
+                            (segments[0]
+                              ? conditionColors[segments[0].kondisiJalan]
+                              : '#64748b'),
+                        }}
+                        title={
+                          ruas.customColor
+                            ? `Warna Kustom (${ruas.customColor}) - Klik untuk edit`
+                            : 'Warna otomatis kondisi STA - Klik untuk edit'
+                        }
+                      />
+                      <span className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20 shrink-0 whitespace-nowrap">
+                        {ruas.nomorRuas}
+                      </span>
+                      <h4 className="font-semibold text-[10px] text-white truncate whitespace-nowrap">
+                        {ruas.namaRuas}
+                      </h4>
+                      <span className="text-[9px] text-slate-400 truncate whitespace-nowrap">
+                        ({ruas.kecamatanPulau})
+                      </span>
                     </div>
 
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-slate-900 text-slate-300 border-slate-700 shrink-0">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border bg-slate-900 text-slate-300 border-slate-700 shrink-0 whitespace-nowrap">
                       {segments.length} STA
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
-                    <div>
-                      <span className="text-slate-500">Panjang: </span>
+                  <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-slate-800 text-[9px] text-slate-300 whitespace-nowrap overflow-x-auto">
+                    <span className="whitespace-nowrap">
+                      <span className="text-slate-500">P: </span>
                       <span className="font-semibold">{ruas.panjangKm} km</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Lebar: </span>
+                    </span>
+                    <span className="whitespace-nowrap">
+                      <span className="text-slate-500">L: </span>
                       <span className="font-semibold">{ruas.lebarMeter} m</span>
-                    </div>
-                    <div>
+                    </span>
+                    <span className="whitespace-nowrap">
                       <span className="text-slate-500">Foto: </span>
-                      <span className="font-semibold text-sky-400">{photoCount} file</span>
-                    </div>
-                    <div>
+                      <span className="font-semibold text-sky-400">{photoCount}</span>
+                    </span>
+                    <span className="whitespace-nowrap">
                       <span className="text-slate-500">Video: </span>
-                      <span className="font-semibold text-rose-400">{videoCount} file</span>
-                    </div>
+                      <span className="font-semibold text-rose-400">{videoCount}</span>
+                    </span>
                   </div>
 
                   {/* Per-STA Surface & Condition preview */}
-                  <div className="mt-2 pt-2 border-t border-slate-800/70 space-y-1">
+                  <div className="mt-1.5 pt-1 border-t border-slate-800/70 space-y-1">
                     {segments.length === 0 ? (
-                      <div className="text-[10px] text-slate-500 italic">
+                      <div className="text-[9px] text-slate-500 italic whitespace-nowrap truncate">
                         Belum ada data permukaan &amp; kondisi per STA
                       </div>
                     ) : (
@@ -1079,13 +1082,13 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         return (
                           <div
                             key={seg.id}
-                            className="flex items-center justify-between gap-1.5 text-[10px] bg-slate-950/60 px-2 py-1 rounded border border-slate-800/80"
+                            className="flex items-center justify-between gap-1.5 text-[9px] bg-slate-950/60 px-1.5 py-0.5 rounded border border-slate-800/80 whitespace-nowrap"
                           >
-                            <span className="font-mono text-sky-400 shrink-0">
+                            <span className="font-mono text-sky-400 shrink-0 whitespace-nowrap">
                               {formatMeterToSTA(seg.startSta).replace('STA ', '')}–{formatMeterToSTA(seg.endSta).replace('STA ', '')}
                             </span>
-                            <span className="text-slate-300 truncate flex-1">{seg.tipePermukaan.split(' ')[0]}</span>
-                            <span className={`px-1.5 py-0.5 rounded-full border font-bold text-[9px] shrink-0 ${segColor.badgeBg}`}>
+                            <span className="text-slate-300 truncate flex-1 whitespace-nowrap">{seg.tipePermukaan.split(' ')[0]}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full border font-bold text-[8px] shrink-0 whitespace-nowrap ${segColor.badgeBg}`}>
                               {seg.kondisiJalan}
                             </span>
                           </div>
@@ -1093,24 +1096,24 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                       })
                     )}
                     {segments.length > 3 && (
-                      <div className="text-[10px] text-slate-400 pl-1">
+                      <div className="text-[9px] text-slate-400 pl-1 whitespace-nowrap">
                         +{segments.length - 3} segmen STA lainnya...
                       </div>
                     )}
                   </div>
 
-                  {/* Two Separated Import Actions per Road Segment: Impor Foto & Impor Video */}
-                  <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                  {/* Action row: Import & GPS Tracker Export in compact single-line horizontal strips */}
+                  <div className="mt-1.5 flex items-center gap-1 overflow-x-auto whitespace-nowrap">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setImportPhotoRuas(ruas);
                       }}
-                      className="flex items-center justify-center gap-1 py-1 px-2 rounded bg-sky-950/90 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-[10px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-0.5 px-1.5 rounded bg-sky-950/90 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-[9px] font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title={`Impor Foto ke Ruas ${ruas.nomorRuas}`}
                     >
-                      <ImagePlus className="w-3 h-3 text-sky-400 shrink-0" />
+                      <ImagePlus className="w-2.5 h-2.5 text-sky-400 shrink-0" />
                       <span>Impor Foto</span>
                     </button>
 
@@ -1120,26 +1123,23 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         setImportVideoRuas(ruas);
                       }}
-                      className="flex items-center justify-center gap-1 py-1 px-2 rounded bg-rose-950/90 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-[10px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-0.5 px-1.5 rounded bg-rose-950/90 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-[9px] font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title={`Impor Video ke Ruas ${ruas.nomorRuas}`}
                     >
-                      <VideoIcon className="w-3 h-3 text-rose-400 shrink-0" />
+                      <VideoIcon className="w-2.5 h-2.5 text-rose-400 shrink-0" />
                       <span>Impor Video</span>
                     </button>
-                  </div>
 
-                  {/* GPS Tracker Per-Ruas Export (Excel, KML, KMZ) */}
-                  <div className="mt-1.5 grid grid-cols-3 gap-1">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         exportGpsTracksToExcel(ruasList, ruas);
                       }}
-                      className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/35 text-emerald-200 text-[10px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-0.5 px-1.5 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/35 text-emerald-200 text-[9px] font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title={`Ekspor Tracker GPS Ruas ${ruas.nomorRuas} ke Excel (.xlsx)`}
                     >
-                      <FileSpreadsheet className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <FileSpreadsheet className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
                       <span>GPS XLS</span>
                     </button>
                     <button
@@ -1148,10 +1148,10 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         exportGpsTracksToKML(ruasList, ruas);
                       }}
-                      className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/35 text-cyan-200 text-[10px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-0.5 px-1.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/35 text-cyan-200 text-[9px] font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title={`Ekspor Tracker GPS Ruas ${ruas.nomorRuas} ke KML`}
                     >
-                      <FileCode className="w-3 h-3 text-cyan-400 shrink-0" />
+                      <FileCode className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
                       <span>GPS KML</span>
                     </button>
                     <button
@@ -1160,26 +1160,26 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         void exportGpsTracksToKMZ(ruasList, ruas);
                       }}
-                      className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/35 text-indigo-200 text-[10px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-0.5 px-1.5 rounded bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/35 text-indigo-200 text-[9px] font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title={`Ekspor Tracker GPS Ruas ${ruas.nomorRuas} ke KMZ`}
                     >
-                      <Route className="w-3 h-3 text-indigo-400 shrink-0" />
+                      <Route className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
                       <span>GPS KMZ</span>
                     </button>
                   </div>
 
                   {/* Quick Action: Atur STA, Edit Warna Layer, Google Maps Navigation, Focus */}
-                  <div className="mt-2 pt-1 flex items-center justify-between gap-2">
+                  <div className="mt-1.5 pt-1 flex items-center justify-between gap-2 whitespace-nowrap overflow-x-auto">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setStaModalRuas(ruas);
                       }}
-                      className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold transition cursor-pointer"
+                      className="flex items-center gap-1 text-[9px] text-emerald-400 hover:text-emerald-300 font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title="Atur Tipe Permukaan & Kondisi per STA"
                     >
-                      <ListChecks className="w-3 h-3" />
+                      <ListChecks className="w-2.5 h-2.5 shrink-0" />
                       <span>Atur STA</span>
                     </button>
 
@@ -1189,10 +1189,10 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         setColorEditTarget({ type: 'ruas', ruas });
                       }}
-                      className="flex items-center gap-1 text-[10px] text-purple-300 hover:text-purple-200 font-semibold transition cursor-pointer"
+                      className="flex items-center gap-1 text-[9px] text-purple-300 hover:text-purple-200 font-semibold whitespace-nowrap shrink-0 transition cursor-pointer"
                       title="Edit Warna Layer Ruas Jalan di Peta"
                     >
-                      <Palette className="w-3 h-3" />
+                      <Palette className="w-2.5 h-2.5 shrink-0" />
                       <span>Warna</span>
                     </button>
 
@@ -1202,10 +1202,10 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         openExternalNavigation(ruas.koordinatAwal[0], ruas.koordinatAwal[1]);
                       }}
-                      className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 transition cursor-pointer"
+                      className="flex items-center gap-1 text-[9px] text-sky-400 hover:text-sky-300 whitespace-nowrap shrink-0 transition cursor-pointer"
                       title="Buka Navigasi Rute di Google Maps"
                     >
-                      <Navigation className="w-3 h-3" />
+                      <Navigation className="w-2.5 h-2.5 shrink-0" />
                       <span>Navigasi</span>
                     </button>
 
@@ -1215,9 +1215,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                         e.stopPropagation();
                         handleZoomToRuas(ruas);
                       }}
-                      className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition cursor-pointer"
+                      className="flex items-center gap-1 text-[9px] text-amber-400 hover:text-amber-300 whitespace-nowrap shrink-0 transition cursor-pointer"
                     >
-                      <Maximize className="w-3 h-3" />
+                      <Maximize className="w-2.5 h-2.5 shrink-0" />
                       <span>Fokus</span>
                     </button>
                   </div>
@@ -1228,20 +1228,20 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
           {/* Selected Ruas Summary Card Footer */}
           {activeRuas && (
-            <div className="p-3 bg-slate-950 border-t border-slate-800 text-xs">
-              <div className="flex items-center justify-between text-slate-300 mb-1">
-                <span className="text-slate-400 font-medium">Ruas Aktif ({activeRuas.nomorRuas}):</span>
+            <div className="px-2.5 py-1.5 bg-slate-950 border-t border-slate-800 text-[10px] space-y-0.5">
+              <div className="flex items-center justify-between gap-2 text-slate-300 whitespace-nowrap">
+                <span className="text-slate-400 font-medium truncate whitespace-nowrap">Ruas Aktif ({activeRuas.nomorRuas}):</span>
                 <button
                   type="button"
                   onClick={() => setStaModalRuas(activeRuas)}
-                  className="font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
+                  className="font-bold text-amber-400 hover:text-amber-300 whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {getRuasSTASegments(activeRuas).length} Segmen STA • Atur
                 </button>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>Panjang: {activeRuas.panjangKm} km</span>
-                <span>Lebar: {activeRuas.lebarMeter} m</span>
+              <div className="flex items-center justify-between gap-2 text-[9px] text-slate-400 whitespace-nowrap">
+                <span>P: {activeRuas.panjangKm} km</span>
+                <span>L: {activeRuas.lebarMeter} m</span>
                 <span>Survei: {activeRuas.lastSurveyDate}</span>
               </div>
             </div>
@@ -1253,77 +1253,30 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
           {/* Top-Right Quick Map Controls (Fit All & GPS Locate) */}
-          <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+          <div className="absolute top-3 right-3 z-[400] flex flex-row flex-nowrap items-center gap-1.5">
             <button
               type="button"
               onClick={handleFitAllRoads}
               title="Tampilkan Seluruh Jaringan Ruas Mentawai"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 shadow-lg text-xs font-semibold backdrop-blur-md transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 shadow-lg text-[10px] font-semibold whitespace-nowrap backdrop-blur-md transition cursor-pointer"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Semua Ruas</span>
+              <RefreshCw className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>Semua Ruas</span>
             </button>
 
             <button
               type="button"
               onClick={handleLocateMe}
               title="Pusatkan ke Lokasi GPS Saya"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 shadow-lg text-xs font-semibold backdrop-blur-md transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 shadow-lg text-[10px] font-semibold whitespace-nowrap backdrop-blur-md transition cursor-pointer"
             >
-              <LocateFixed className={`w-3.5 h-3.5 text-sky-400 ${isLocating ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Lokasi GPS</span>
+              <LocateFixed className={`w-3 h-3 text-sky-400 shrink-0 ${isLocating ? 'animate-spin' : ''}`} />
+              <span>Lokasi GPS</span>
             </button>
           </div>
 
-          {/* Map Legend Overlay */}
-          <div className="absolute bottom-6 left-4 z-[400] bg-slate-900/90 backdrop-blur-md p-3 rounded-lg border border-slate-700 shadow-xl text-xs space-y-1.5 max-w-[235px]">
-            <div className="font-bold text-slate-200 text-[11px] border-b border-slate-700 pb-1 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-3 h-3 text-amber-400" />
-                <span>Legenda Kondisi Jalan</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setColorEditTarget({ type: 'legend' })}
-                className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-0.5 cursor-pointer"
-                title="Edit Warna Layer Kondisi"
-              >
-                <Palette className="w-3 h-3" />
-                <span>Edit</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className="w-3 h-3 rounded-full shrink-0 border border-white/30"
-                style={{ backgroundColor: conditionColors.Baik }}
-              />
-              <span className="text-slate-300">Baik (IRI &lt; 4, SDI &lt; 50)</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className="w-3 h-3 rounded-full shrink-0 border border-white/30"
-                style={{ backgroundColor: conditionColors.Sedang }}
-              />
-              <span className="text-slate-300">Sedang (IRI 4-8, SDI 50-100)</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className="w-3 h-3 rounded-full shrink-0 border border-white/30"
-                style={{ backgroundColor: conditionColors['Rusak Ringan'] }}
-              />
-              <span className="text-slate-300">Rusak Ringan (Rehabilitasi)</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className="w-3 h-3 rounded-full shrink-0 border border-white/30"
-                style={{ backgroundColor: conditionColors['Rusak Berat'] }}
-              />
-              <span className="text-slate-300">Rusak Berat (Rekonstruksi)</span>
-            </div>
-          </div>
-
           {/* Live Cursor Coordinates & Zoom HUD */}
-          <div className="hidden sm:flex items-center gap-2 absolute bottom-6 right-4 z-[400] bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700 shadow-lg text-[11px] font-mono text-slate-300">
+          <div className="hidden sm:flex items-center gap-1.5 absolute bottom-4 right-3 z-[400] bg-slate-900/90 backdrop-blur-md px-2 py-1 rounded border border-slate-700 shadow-lg text-[10px] font-mono text-slate-300 whitespace-nowrap">
             <span>Z:{cursorCoords.zoom}</span>
             <span className="text-slate-600">|</span>
             <span>{cursorCoords.lat.toFixed(5)}°, {cursorCoords.lng.toFixed(5)}°</span>
@@ -1331,24 +1284,24 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
           {/* Selected Point Photo Inspector Popover */}
           {selectedPointPhoto && (
-            <div className="absolute top-14 right-3 z-[450] bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-3 w-80 max-w-[90vw]">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="font-bold text-xs text-white">
+            <div className="absolute top-12 right-3 z-[450] bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-2.5 w-72 max-w-[90vw]">
+              <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800 whitespace-nowrap">
+                <div className="flex items-center gap-1 min-w-0">
+                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="font-bold text-[10px] text-white truncate whitespace-nowrap">
                     {selectedPointPhoto.nomorRuas} - {selectedPointPhoto.staText}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedPointPhoto(null)}
-                  className="text-slate-400 hover:text-white text-xs font-bold px-1 cursor-pointer"
+                  className="text-slate-400 hover:text-white text-[10px] font-bold px-1 shrink-0 cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <div className="w-full aspect-[127/89] rounded-lg border border-slate-800 overflow-hidden bg-black relative">
                   <img
                     src={selectedPointPhoto.imageUrl}
@@ -1356,54 +1309,54 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                     className="w-full h-full object-cover cursor-pointer hover:opacity-95"
                     onClick={() => onViewPhoto(selectedPointPhoto)}
                   />
-                  <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-black/75 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">
+                  <span className="absolute top-1 left-1 text-[8px] font-bold bg-black/75 text-amber-300 px-1 py-0.5 rounded border border-amber-500/40 whitespace-nowrap">
                     3R 8,9×12,7 cm • 600 DPI
                   </span>
                 </div>
               </div>
 
-              <div className="mt-2 text-[11px] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Ruas:</span>
-                  <span className="text-slate-200 font-semibold">{selectedPointPhoto.ruasNama}</span>
+              <div className="mt-1.5 text-[10px] space-y-0.5">
+                <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                  <span className="text-slate-400 shrink-0">Ruas:</span>
+                  <span className="text-slate-200 font-semibold truncate">{selectedPointPhoto.ruasNama}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Kondisi:</span>
-                  <span className="font-bold text-amber-400">{selectedPointPhoto.pkrmsCondition}</span>
+                <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                  <span className="text-slate-400 shrink-0">Kondisi:</span>
+                  <span className="font-bold text-amber-400 truncate">{selectedPointPhoto.pkrmsCondition}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Cacat:</span>
-                  <span className="text-rose-400 font-semibold">
+                <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                  <span className="text-slate-400 shrink-0">Cacat:</span>
+                  <span className="text-rose-400 font-semibold truncate">
                     {selectedPointPhoto.defects.length > 0
                       ? selectedPointPhoto.defects.map(d => `${d.type}(${d.severity})`).join(', ')
                       : 'Nihil (Permukaan Mantap)'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Koordinat:</span>
-                  <span className="font-mono text-slate-300">
+                <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                  <span className="text-slate-400 shrink-0">Koordinat:</span>
+                  <span className="font-mono text-slate-300 truncate">
                     {selectedPointPhoto.coordinates.lat.toFixed(5)}, {selectedPointPhoto.coordinates.lng.toFixed(5)}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => onViewPhoto(selectedPointPhoto)}
-                  className="flex-1 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs text-center flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  className="flex-1 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] whitespace-nowrap text-center flex items-center justify-center gap-1 transition cursor-pointer"
                 >
-                  <Eye className="w-3.5 h-3.5" />
+                  <Eye className="w-3 h-3 shrink-0" />
                   <span>Lihat HD 600 DPI</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => openExternalNavigation(selectedPointPhoto.coordinates.lat, selectedPointPhoto.coordinates.lng)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 cursor-pointer"
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 cursor-pointer shrink-0"
                   title="Navigasi ke titik ini dengan Google Maps"
                 >
-                  <Navigation className="w-4 h-4" />
+                  <Navigation className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
