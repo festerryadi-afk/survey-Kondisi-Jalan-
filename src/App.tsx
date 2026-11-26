@@ -314,11 +314,14 @@ export default function App() {
   }, [videos]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('mentawai_notifs_v2', JSON.stringify(notifications));
-    } catch {
-      // ignore storage quota error
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('mentawai_notifs_v2', JSON.stringify(notifications));
+      } catch {
+        // ignore storage quota error
+      }
+    }, 400);
+    return () => clearTimeout(timer);
   }, [notifications]);
 
   useEffect(() => {

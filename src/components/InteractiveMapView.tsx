@@ -675,10 +675,10 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
   const activeRuas = ruasList.find((r) => r.id === selectedRuasId) || ruasList[0];
 
   return (
-    <div className="flex flex-col flex-1 h-auto min-h-[calc(100vh-116px)] md:h-[calc(100vh-116px)] bg-slate-950 text-slate-100 overflow-y-auto md:overflow-hidden">
+    <div className="flex flex-col flex-1 h-auto min-h-[calc(100vh-104px)] md:h-[calc(100vh-116px)] bg-slate-950 text-slate-100 overflow-y-auto md:overflow-hidden">
       {/* Compact Proportional Single-Line Toolbar */}
       <div className="bg-slate-900 border-b border-slate-800 px-2 py-1 shrink-0 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-nowrap items-center justify-between gap-1.5 overflow-x-auto whitespace-nowrap">
+        <div className="max-w-7xl mx-auto flex flex-nowrap items-center justify-between gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
           {/* Refined and compact proportional title frame */}
           <div className="flex items-center gap-1.5 bg-slate-950/70 px-2 py-0.5 rounded border border-slate-700/80 shrink-0 whitespace-nowrap">
             <Compass className="w-3 h-3 text-amber-400 shrink-0" />
@@ -896,7 +896,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       </div>
 
       {/* Main Map Body: Sidebar List + Map Viewport */}
-      <div className="flex-1 min-h-[360px] md:min-h-0 flex overflow-hidden relative">
+      <div className="flex-1 min-h-[320px] sm:min-h-[360px] md:min-h-0 flex overflow-hidden relative">
         {/* Left Side: Ruas Selector & Detail Panel */}
         <div className={`${mobileTab === 'list' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 bg-slate-900/95 border-r border-slate-800 flex-col shrink-0 z-10 overflow-hidden`}>
           <div className="px-2.5 py-1.5 border-b border-slate-800 bg-slate-950/40">
@@ -1249,11 +1249,11 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
         </div>
 
         {/* Map Viewport Container (Explicit non-zero height guaranteed across Mobile, Tablet, PC) */}
-        <div className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-1 min-h-[360px] sm:min-h-[540px] h-full relative bg-slate-900`}>
+        <div className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-1 min-h-[320px] sm:min-h-[520px] h-full relative bg-slate-900`}>
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
           {/* Top-Right Quick Map Controls (Fit All & GPS Locate) */}
-          <div className="absolute top-3 right-3 z-[400] flex flex-row flex-nowrap items-center gap-1.5">
+          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-[400] flex flex-row flex-nowrap items-center gap-1.5">
             <button
               type="button"
               onClick={handleFitAllRoads}
@@ -1284,7 +1284,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
           {/* Selected Point Photo Inspector Popover */}
           {selectedPointPhoto && (
-            <div className="absolute top-12 right-3 z-[450] bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-2.5 w-72 max-w-[90vw]">
+            <div className="absolute top-11 right-2.5 sm:top-12 sm:right-3 z-[450] bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-2.5 w-[calc(100%-1.25rem)] sm:w-72 max-w-xs">
               <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800 whitespace-nowrap">
                 <div className="flex items-center gap-1 min-w-0">
                   <MapPin className="w-3 h-3 text-amber-400 shrink-0" />

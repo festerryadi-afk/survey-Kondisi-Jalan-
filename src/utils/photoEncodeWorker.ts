@@ -9,6 +9,7 @@ export interface PhotoEncodeWorkerRequest {
   hdHeight: number;
   storageWidth: number;
   storageHeight: number;
+  compactMode?: boolean;
   watermark: {
     nomorRuas: string;
     namaRuas: string;
@@ -198,7 +199,8 @@ function drawWatermarkOffscreen(
   ctx: OffscreenCanvasRenderingContext2D,
   width: number,
   height: number,
-  metadata: PhotoEncodeWorkerRequest['watermark']
+  metadata: PhotoEncodeWorkerRequest['watermark'],
+  fastNoBlur = false
 ) {
   const baseFontSize = Math.max(14, Math.round(width * 0.022));
   const paddingX = Math.max(16, Math.round(width * 0.025));
@@ -208,10 +210,12 @@ function drawWatermarkOffscreen(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
 
-  ctx.shadowColor = '#000000';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 2;
+  if (!fastNoBlur) {
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+  }
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 3.5;
   ctx.fillStyle = '#FFFFFF';
@@ -233,7 +237,7 @@ function drawWatermarkOffscreen(
 
 self.onmessage = async (event: MessageEvent<PhotoEncodeWorkerRequest>) => {
   const req = event.data;
-  const { id, bitmap, useSimulation, defects, hdWidth, hdHeight, storageWidth, storageHeight, watermark } = req;
+  const { id, bitmap, useSimulation, defects, hdWidth, hdHeight, storageWidth, storageHeight, compactMode, watermark } = req;
 
   let hdCanvas: OffscreenCanvas | null = null;
   let storageCanvas: OffscreenCanvas | null = null;
@@ -252,20 +256,22 @@ self.onmessage = async (event: MessageEvent<PhotoEncodeWorkerRequest>) => {
       drawSimulatedRoadOnOffscreen(hdCtx, hdWidth, hdHeight, defects || []);
     }
 
-    drawWatermarkOffscreen(hdCtx, hdWidth, hdHeight, watermark);
+    drawWatermarkOffscreen(hdCtx, hdWidth, hdHeight, watermark, Boolean(compactMode));
 
-    const hdBlob = await hdCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.95 });
+    const hdBlob = await hdCanvas.convertToBlob({ type: 'image/jpeg', quality: compactMode ? 0.88 : 0.95 });
     const hd600DpiDataUrl = await blobToDpi600DataUrl(hdBlob, 600);
 
-    storageCanvas = new OffscreenCanvas(storageWidth, storageHeight);
-    const storageCtx = storageCanvas.getContext('2d', { alpha: false });
     let storageDataUrl = hd600DpiDataUrl;
-    if (storageCtx) {
-      storageCtx.imageSmoothingEnabled = true;
-      storageCtx.imageSmoothingQuality = 'high';
-      storageCtx.drawImage(hdCanvas, 0, 0, storageWidth, storageHeight);
-      const storageBlob = await storageCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
-      storageDataUrl = await blobToDpi600DataUrl(storageBlob, 600);
+    if (!compactMode) {
+      storageCanvas = new OffscreenCanvas(storageWidth, storageHeight);
+      const storageCtx = storageCanvas.getContext('2d', { alpha: false });
+      if (storageCtx) {
+        storageCtx.imageSmoothingEnabled = true;
+        storageCtx.imageSmoothingQuality = 'high';
+        storageCtx.drawImage(hdCanvas, 0, 0, storageWidth, storageHeight);
+        const storageBlob = await storageCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+        storageDataUrl = await blobToDpi600DataUrl(storageBlob, 600);
+      }
     }
 
     const res: PhotoEncodeWorkerResponse = {

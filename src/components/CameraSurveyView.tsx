@@ -218,6 +218,75 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
   const lastCapturedPhotoRef = useRef<SurveyPhoto | null>(null);
   const videoElapsedSecRef = useRef<number>(0);
   const activeRecordingRuasRef = useRef<RuasJalan | undefined>(currentRuas);
+  const hasPendingGpsTrackFlushRef = useRef<boolean>(false);
+  const pendingGpsFlushOptionsRef = useRef<{
+    customEndStaMeters?: number;
+    applyGeometry?: boolean;
+    silent?: boolean;
+  } | null>(null);
+  const pendingRecordingPhotosRef = useRef<Array<{ photo: SurveyPhoto; hd600DpiDataUrl: string }>>([]);
+  const pendingRecordingAlertsRef = useRef<
+    Array<{ title: string; message: string; ruasId: string; sta: string }>
+  >([]);
+
+  const dispatchSurveyAlert = (
+    title: string,
+    message: string,
+    ruasId: string,
+    sta: string
+  ) => {
+    if (isRecordingVideoRef.current) {
+      pendingRecordingAlertsRef.current.push({ title, message, ruasId, sta });
+      if (pendingRecordingAlertsRef.current.length > 20) {
+        pendingRecordingAlertsRef.current.shift();
+      }
+      return;
+    }
+    onTriggerAlertRef.current(title, message, ruasId, sta);
+  };
+
+  const flushDeferredSurveyArtifacts = (
+    roadOverride?: RuasJalan,
+    gpsOptions?: {
+      customEndStaMeters?: number;
+      applyGeometry?: boolean;
+      silent?: boolean;
+    }
+  ) => {
+    const targetRoad = roadOverride || currentRuasRef.current;
+    if (targetRoad && (hasPendingGpsTrackFlushRef.current || gpsOptions) && gpsTrackRef.current.length > 0) {
+      const mergedOpts = {
+        silent: true,
+        ...(pendingGpsFlushOptionsRef.current || {}),
+        ...(gpsOptions || {}),
+      };
+      hasPendingGpsTrackFlushRef.current = false;
+      pendingGpsFlushOptionsRef.current = null;
+      onSaveGpsTrackRef.current?.(targetRoad.id, [...gpsTrackRef.current], mergedOpts);
+    }
+
+    if (pendingRecordingPhotosRef.current.length > 0) {
+      const queuedPhotos = pendingRecordingPhotosRef.current.splice(0);
+      const lastQueued = queuedPhotos[queuedPhotos.length - 1];
+      setLastCapturedPhoto(lastQueued.photo);
+      setCapturedCountThisSession((c) => c + queuedPhotos.length);
+      queuedPhotos.forEach((item, idx) => {
+        setTimeout(() => {
+          if (item.hd600DpiDataUrl) {
+            cacheHd600DpiPhoto(item.photo.id, item.hd600DpiDataUrl);
+          }
+          onAddPhoto(item.photo);
+        }, idx * 120);
+      });
+    }
+
+    if (pendingRecordingAlertsRef.current.length > 0) {
+      const queuedAlerts = pendingRecordingAlertsRef.current.splice(0);
+      queuedAlerts.forEach((a) => {
+        onTriggerAlertRef.current(a.title, a.message, a.ruasId, a.sta);
+      });
+    }
+  };
 
   useEffect(() => {
     onAddVideoRef.current = onAddVideo;
@@ -302,14 +371,20 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
   useEffect(() => {
     return () => {
       onSurveyFocusModeChange?.(false);
-      if (currentRuasRef.current && gpsTrackRef.current.length > 0) {
-        onSaveGpsTrackRef.current?.(currentRuasRef.current.id, gpsTrackRef.current, { silent: true });
-      }
       if (isRecordingVideoRef.current) {
-        void stopAndSaveVideoRecording(Math.round(staRef.current), activeRecordingRuasRef.current || currentRuasRef.current);
-      } else if (recorderRef.current) {
-        void recorderRef.current.stop(`video-cleanup-${Date.now()}`);
-        recorderRef.current = null;
+        void stopAndSaveVideoRecording(
+          Math.round(staRef.current),
+          activeRecordingRuasRef.current || currentRuasRef.current
+        );
+      } else {
+        flushDeferredSurveyArtifacts(currentRuasRef.current);
+        if (currentRuasRef.current && gpsTrackRef.current.length > 0) {
+          onSaveGpsTrackRef.current?.(currentRuasRef.current.id, gpsTrackRef.current, { silent: true });
+        }
+        if (recorderRef.current) {
+          void recorderRef.current.stop(`video-cleanup-${Date.now()}`);
+          recorderRef.current = null;
+        }
       }
     };
   }, []);
@@ -373,7 +448,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
     const sorted = existing.sort((a, b) => a.staMeters - b.staMeters);
     gpsTrackRef.current = sorted;
-    if (!isSurveyRunningRef.current) {
+    if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
       setGpsTrackPoints(sorted);
     }
     lastTrackedCoordRef.current = {
@@ -390,22 +465,48 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       sorted.length % 4 === 0;
 
     if (shouldFlush) {
-      onSaveGpsTrackRef.current?.(road.id, sorted, {
-        customEndStaMeters: options?.customEndStaMeters,
-        applyGeometry: options?.applyGeometry,
-        silent: options?.silent ?? true,
-      });
+      if (isRecordingVideoRef.current) {
+        hasPendingGpsTrackFlushRef.current = true;
+        if (
+          typeof options?.customEndStaMeters === 'number' ||
+          typeof options?.applyGeometry === 'boolean' ||
+          typeof options?.silent === 'boolean'
+        ) {
+          pendingGpsFlushOptionsRef.current = {
+            ...(pendingGpsFlushOptionsRef.current || {}),
+            ...(typeof options.customEndStaMeters === 'number'
+              ? { customEndStaMeters: options.customEndStaMeters }
+              : {}),
+            ...(typeof options.applyGeometry === 'boolean'
+              ? { applyGeometry: options.applyGeometry }
+              : {}),
+            ...(typeof options.silent === 'boolean' ? { silent: options.silent } : {}),
+          };
+        }
+      } else {
+        hasPendingGpsTrackFlushRef.current = false;
+        pendingGpsFlushOptionsRef.current = null;
+        onSaveGpsTrackRef.current?.(road.id, sorted, {
+          customEndStaMeters: options?.customEndStaMeters,
+          applyGeometry: options?.applyGeometry,
+          silent: options?.silent ?? true,
+        });
+      }
     }
   };
 
   // Switch ruas reset (save active video recording & flush GPS track for previous road if running)
   useEffect(() => {
+    const prevRecordingRoad = activeRecordingRuasRef.current;
+    if (prevRecordingRoad && prevRecordingRoad.id !== selectedRuasId) {
+      flushDeferredSurveyArtifacts(prevRecordingRoad);
+    }
     if (
       isRecordingVideoRef.current &&
-      activeRecordingRuasRef.current &&
-      activeRecordingRuasRef.current.id !== selectedRuasId
+      prevRecordingRoad &&
+      prevRecordingRoad.id !== selectedRuasId
     ) {
-      void stopAndSaveVideoRecording(Math.round(staRef.current), activeRecordingRuasRef.current);
+      void stopAndSaveVideoRecording(Math.round(staRef.current), prevRecordingRoad);
     }
     if (currentRuas) {
       const [initLat, initLng] = interpolateCoordAlongRuas(currentRuas, 0);
@@ -666,9 +767,10 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       }
     );
 
-    if (autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current < totalMeters) {
+    const shouldCaptureEndPhoto =
+      autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current < totalMeters;
+    if (shouldCaptureEndPhoto) {
       lastAutoCaptureStaRef.current = totalMeters;
-      void triggerPhotoCapture(endLat, endLng, totalMeters, true);
       lastCaptureCoordRef.current = { lat: endLat, lng: endLng };
     }
 
@@ -687,17 +789,25 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     setIsSurveyRunning(false);
     syncSurveyUiFromRefs();
 
-    if (isRecordingVideoRef.current) {
-      void stopAndSaveVideoRecording(totalMeters);
-    }
+    const finalizeAfterVideo = () => {
+      if (shouldCaptureEndPhoto) {
+        void triggerPhotoCapture(endLat, endLng, totalMeters, true);
+      }
+      playAlertSound(false);
+      dispatchSurveyAlert(
+        'Survei Otomatis & Tracking GPS Selesai',
+        `Survei pada ${road.namaRuas} mencapai STA Akhir (${formatSTA(totalMeters)} / ${(totalMeters / 1000).toFixed(3)} km). Jalur GPS (${gpsTrackRef.current.length} titik) tersimpan.`,
+        road.id,
+        formatSTA(totalMeters)
+      );
+    };
 
-    playAlertSound(false);
-    onTriggerAlert(
-      'Survei Otomatis & Tracking GPS Selesai',
-      `Survei pada ${road.namaRuas} mencapai STA Akhir (${formatSTA(totalMeters)} / ${(totalMeters / 1000).toFixed(3)} km). Jalur GPS (${gpsTrackRef.current.length} titik) tersimpan.`,
-      road.id,
-      formatSTA(totalMeters)
-    );
+    if (isRecordingVideoRef.current) {
+      void stopAndSaveVideoRecording(totalMeters, road).then(finalizeAfterVideo);
+    } else {
+      flushDeferredSurveyArtifacts(road);
+      finalizeAfterVideo();
+    }
   };
 
   // Real GPS tracking with stationary drift filtering, idle reset, 100m checkpoints, polyline breadcrumbs & end-of-road stop
@@ -707,7 +817,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
       const resetSpeedToZero = () => {
         vehicleSpeedRef.current = 0;
-        if (!isSurveyRunningRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setVehicleSpeedKmh(0);
         }
       };
@@ -747,7 +857,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             altitude: alt,
             accuracy: acc,
           };
-          if (!isSurveyRunningRef.current) {
+          if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
             setCurrentCoord(currentCoordRef.current);
           }
 
@@ -758,7 +868,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                 ? Math.min(120, Math.round(rawHardwareSpeedMs * 3.6))
                 : 0;
             vehicleSpeedRef.current = initialSpeedKmh;
-            if (!isSurveyRunningRef.current) {
+            if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
               setVehicleSpeedKmh(initialSpeedKmh);
             }
             if (staRef.current === 0) {
@@ -804,7 +914,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           }
 
           vehicleSpeedRef.current = autoSpeedKmh;
-          if (!isSurveyRunningRef.current) {
+          if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
             setVehicleSpeedKmh(autoSpeedKmh);
           }
           armIdleZeroTimer();
@@ -820,7 +930,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             const actualMoved = Math.max(0, clampedNextSta - staRef.current);
             staRef.current = clampedNextSta;
             distAccumRef.current += actualMoved;
-            if (!isSurveyRunningRef.current) {
+            if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
               setCurrentSta(Math.round(clampedNextSta));
               setDistanceSinceLastCapture(distAccumRef.current);
             }
@@ -867,7 +977,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               void triggerPhotoCapture(newLat, newLng, targetSta, true);
               lastCaptureCoordRef.current = { lat: newLat, lng: newLng };
               distAccumRef.current = Math.max(0, clampedNextSta - targetSta);
-              if (!isSurveyRunningRef.current) {
+              if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
                 setDistanceSinceLastCapture(distAccumRef.current);
               }
             }
@@ -996,12 +1106,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           ? Math.round(rawSpeedKmh * 10) / 10
           : Math.round(rawSpeedKmh);
       vehicleSpeedRef.current = computedAutoSpeed;
-      if (
-        !isSurveyRunningRef.current ||
-        (!cameraActiveRef.current && Math.abs(computedAutoSpeed - lastSimUiSpeed) >= 3)
-      ) {
-        lastSimUiSpeed = computedAutoSpeed;
-        setVehicleSpeedKmh(computedAutoSpeed);
+      if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
+        if (Math.abs(computedAutoSpeed - lastSimUiSpeed) >= 3) {
+          lastSimUiSpeed = computedAutoSpeed;
+          setVehicleSpeedKmh(computedAutoSpeed);
+        }
       }
 
       const nextSta = Math.min(totalRoadMeters, staRef.current + metersMoved);
@@ -1015,7 +1124,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         lat: nextLat,
         lng: nextLng,
       };
-      if (!isSurveyRunningRef.current) {
+      if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
         setCurrentSta(Math.round(nextSta));
         setCurrentCoord(currentCoordRef.current);
       }
@@ -1054,7 +1163,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       }
 
       distAccumRef.current += actualMoved;
-      if (!isSurveyRunningRef.current) {
+      if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
         setDistanceSinceLastCapture(distAccumRef.current);
       }
       while (autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current + 100 <= nextSta) {
@@ -1064,7 +1173,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         void triggerPhotoCapture(capLat, capLng, targetSta, true);
         lastCaptureCoordRef.current = { lat: capLat, lng: capLng };
         distAccumRef.current = Math.max(0, nextSta - targetSta);
-        if (!isSurveyRunningRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setDistanceSinceLastCapture(distAccumRef.current);
         }
       }
@@ -1078,7 +1187,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       if (!aiDetectionEnabledRef.current) {
         if (detectedDefectsRef.current.length > 0) {
           detectedDefectsRef.current = [];
-          if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+          if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
             setDetectedDefects([]);
           }
         }
@@ -1096,11 +1205,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 38, y: 55, width: 24, height: 18 },
         };
         detectedDefectsRef.current = [newDefect];
-        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setDetectedDefects([newDefect]);
         }
         playAlertSound(true);
-        onTriggerAlert(
+        dispatchSurveyAlert(
           'Deteksi Cacat Kritis: Lubang Berat',
           `Lubang terdeteksi pada ${activeRoad.namaRuas} (${formatSTA(Math.round(nextSta))}). Diameter 26cm, kedalaman 5.8cm.`,
           activeRoad.id,
@@ -1116,7 +1225,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 32, y: 50, width: 36, height: 22 },
         };
         detectedDefectsRef.current = [newDefect];
-        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setDetectedDefects([newDefect]);
         }
         playAlertSound(false);
@@ -1130,12 +1239,12 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 68, y: 58, width: 20, height: 16 },
         };
         detectedDefectsRef.current = [newDefect];
-        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setDetectedDefects([newDefect]);
         }
       } else if (detectedDefectsRef.current.length > 0) {
         detectedDefectsRef.current = [];
-        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+        if (!isSurveyRunningRef.current && !isRecordingVideoRef.current) {
           setDetectedDefects([]);
         }
       }
@@ -1275,7 +1384,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           if (result.condition === 'Rusak Berat' || result.condition === 'Rusak Ringan') {
             playAlertSound(result.condition === 'Rusak Berat');
             if (!options?.silent || result.condition === 'Rusak Berat') {
-              onTriggerAlert(
+              dispatchSurveyAlert(
                 `Deteksi AI Live: ${result.condition}`,
                 `${activeRuas.namaRuas} (${formatSTA(staNow)}): ${result.summary}`,
                 activeRuas.id,
@@ -1357,6 +1466,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             id: photoId,
             bitmap: frameBitmap,
             watermark: watermarkMeta,
+            compactMode: isVideoRecordingNow,
           });
           if (!workerResult) {
             // Re-grab or draw simulated if bitmap was transferred/neutered
@@ -1387,6 +1497,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             id: photoId,
             bitmap: capturedFrame.source,
             watermark: watermarkMeta,
+            compactMode: false,
           });
           if (!workerResult) {
             capturedFrame.cleanup();
@@ -1420,6 +1531,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         useSimulation: true,
         defects: activeDefects,
         watermark: watermarkMeta,
+        compactMode: isRecordingVideoRef.current,
       });
 
       if (workerResult) {
@@ -1438,9 +1550,6 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     }
 
     if (!dataUrl) return;
-    if (hd600DpiDataUrl) {
-      cacheHd600DpiPhoto(photoId, hd600DpiDataUrl);
-    }
 
     // Evaluate PKRMS condition for this capture
     const pkrms = evaluatePKRMSCondition(activeDefects);
@@ -1484,11 +1593,20 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       isAutoCapture: isAuto,
     };
 
+    if (isRecordingVideoRef.current) {
+      // Saat video sedang direkam: antrekan foto & cache IndexedDB agar main thread & App state tidak terganggu
+      pendingRecordingPhotosRef.current.push({ photo: newPhoto, hd600DpiDataUrl });
+      return;
+    }
+
+    if (hd600DpiDataUrl) {
+      cacheHd600DpiPhoto(photoId, hd600DpiDataUrl);
+    }
     onAddPhoto(newPhoto);
     setLastCapturedPhoto(newPhoto);
     setCapturedCountThisSession((c) => c + 1);
 
-    // Jika kamera fisik aktif, Deteksi AI aktif & perangkat online, analisis otomatis tingkat kerusakan dari foto asli
+    // Jika kamera fisik aktif, Deteksi AI aktif & perangkat online (dan tidak sedang merekam video), analisis otomatis foto asli
     if (cameraActive && aiDetectionEnabledRef.current && isOnline && onUpdatePhoto) {
       void analyzeRoadDamageFromPhoto(dataUrl, newPhoto.surfaceType, { isBackground: true })
         .then((result) => {
@@ -1503,7 +1621,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           setLastCapturedPhoto((prev) => (prev?.id === updatedPhoto.id ? updatedPhoto : prev));
           if (result.condition === 'Rusak Berat' || result.condition === 'Rusak Ringan') {
             playAlertSound(result.condition === 'Rusak Berat');
-            onTriggerAlert(
+            dispatchSurveyAlert(
               `Deteksi AI Kamera: ${result.condition}`,
               `${activeRuas.namaRuas} (${newPhoto.staText}): ${result.summary}`,
               activeRuas.id,
@@ -1529,7 +1647,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             }
             lastAiQuotaAlertAtRef.current = now;
           }
-          onTriggerAlert(
+          dispatchSurveyAlert(
             isQuotaErr ? 'Kuota AI Sementara Tercapai' : 'Analisis AI Foto Tertunda',
             `${activeRuas.namaRuas} (${newPhoto.staText}): ${msg}`,
             activeRuas.id,
@@ -1664,6 +1782,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       activeRuas.id,
       formatSTA(endSta)
     );
+    flushDeferredSurveyArtifacts(activeRuas);
   };
 
   const startVideoRecording = (initialSta?: number) => {
@@ -1685,8 +1804,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         (typeof window !== 'undefined' && window.innerWidth <= 480));
     const recDims = isCompactAndroid
       ? activeCamSettings.resolution === '1080p'
-        ? { width: 960, height: 540 }
-        : { width: 854, height: 480 }
+        ? { width: 854, height: 480 }
+        : { width: 640, height: 360 }
       : activeCamSettings.resolution === '540p'
         ? getResolutionDimensions('540p')
         : getResolutionDimensions('720p');
@@ -1696,8 +1815,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     const rawBitrate = getVideoBitrateBps(activeStorageSettings.videoBitratePreset);
     const recBitrate = isCompactAndroid
       ? batterySaver
-        ? 1_100_000
-        : Math.min(1_500_000, rawBitrate)
+        ? 900_000
+        : Math.min(1_200_000, rawBitrate)
       : rawBitrate;
 
     const recorder = new RoadSurveyRecorder({
@@ -1823,6 +1942,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         videoPauseStartedAtMsRef.current = Date.now();
         recorderRef.current?.pause();
       }
+      flushDeferredSurveyArtifacts(currentRuasRef.current);
       syncSurveyUiFromRefs();
     } else {
       if (videoPauseStartedAtMsRef.current > 0) {
@@ -1871,9 +1991,10 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       const finLat = !useSimulationDriving ? currentCoordRef.current.lat : fallbackLat;
       const finLng = !useSimulationDriving ? currentCoordRef.current.lng : fallbackLng;
       const calculatedKm = Number((surveyedMeters / 1000).toFixed(3));
+      const stoppedRoad = currentRuas;
 
       recordGpsTrackPoint(
-        currentRuas,
+        stoppedRoad,
         {
           staMeters: surveyedMeters,
           lat: finLat,
@@ -1893,10 +2014,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         }
       );
 
-      if (autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current < surveyedMeters) {
+      const shouldCaptureFinalPhoto =
+        autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current < surveyedMeters;
+      if (shouldCaptureFinalPhoto) {
         lastAutoCaptureStaRef.current = surveyedMeters;
         lastCaptureCoordRef.current = { lat: finLat, lng: finLng };
-        void triggerPhotoCapture(finLat, finLng, surveyedMeters, true);
       }
 
       staRef.current = surveyedMeters;
@@ -1908,23 +2030,33 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         lng: finLng,
       }));
 
-      if (isRecordingVideoRef.current) {
-        void stopAndSaveVideoRecording(surveyedMeters);
-      }
+      const finalizeAfterStop = () => {
+        if (shouldCaptureFinalPhoto) {
+          void triggerPhotoCapture(finLat, finLng, surveyedMeters, true);
+        }
+        playAlertSound(false);
+        dispatchSurveyAlert(
+          'Panjang Ruas Dihitung Otomatis',
+          `Survei ${stoppedRoad.namaRuas} berhenti pada ${formatSTA(surveyedMeters)}. Panjang ruas otomatis diperbarui menjadi ${calculatedKm.toFixed(3)} km (${surveyedMeters} m).`,
+          stoppedRoad.id,
+          formatSTA(surveyedMeters)
+        );
+      };
 
-      playAlertSound(false);
-      onTriggerAlert(
-        'Panjang Ruas Dihitung Otomatis',
-        `Survei ${currentRuas.namaRuas} berhenti pada ${formatSTA(surveyedMeters)}. Panjang ruas otomatis diperbarui menjadi ${calculatedKm.toFixed(3)} km (${surveyedMeters} m).`,
-        currentRuas.id,
-        formatSTA(surveyedMeters)
-      );
-    } else {
-      if (gpsTrackRef.current.length > 0) {
-        onSaveGpsTrackRef.current?.(currentRuas.id, gpsTrackRef.current, { silent: true });
-      }
       if (isRecordingVideoRef.current) {
-        void stopAndSaveVideoRecording(0);
+        void stopAndSaveVideoRecording(surveyedMeters, stoppedRoad).then(finalizeAfterStop);
+      } else {
+        flushDeferredSurveyArtifacts(stoppedRoad);
+        finalizeAfterStop();
+      }
+    } else {
+      if (isRecordingVideoRef.current) {
+        void stopAndSaveVideoRecording(0, currentRuas);
+      } else {
+        flushDeferredSurveyArtifacts(currentRuas);
+        if (gpsTrackRef.current.length > 0) {
+          onSaveGpsTrackRef.current?.(currentRuas.id, gpsTrackRef.current, { silent: true });
+        }
       }
     }
   };
@@ -2098,11 +2230,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         Disembunyikan saat survei berjalan agar layar depan hanya menampilkan kamera realtime
       */}
       {!isSurveyRunning && (
-      <div className="bg-slate-900/95 border-b border-slate-800 px-2.5 sm:px-4 py-1.5 sm:py-2 flex flex-col gap-1.5 sm:gap-2 shrink-0 shadow-lg z-20 backdrop-blur-md">
-        {/* Row 1: Ruas Selector, STA, Speed, GPS, and Recording badge */}
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs">
+      <div className="bg-slate-900/95 border-b border-slate-800 px-2.5 sm:px-4 py-1.5 sm:py-2 flex flex-col gap-1 sm:gap-1.5 shrink-0 shadow-lg z-20 backdrop-blur-md">
+        {/* Row 1: Ruas Selector */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2.5 text-[10px] sm:text-xs">
           {/* Ruas Selector */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto min-w-0">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto sm:flex-1 min-w-0">
             <span className="font-semibold text-amber-400 whitespace-nowrap shrink-0">Ruas:</span>
             <select
               value={selectedRuasId}
@@ -2117,160 +2249,134 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             </select>
           </div>
 
-          {/* Current STA & Speed */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-700">
+          {/* STA, Speed, Recording badge & GPS on 1 clean horizontal scrollable line */}
+          <div className="flex items-center flex-nowrap gap-1.5 overflow-x-auto no-scrollbar sm:overflow-visible shrink-0">
+            <div className="flex items-center gap-1 bg-slate-800/90 px-2 py-0.5 sm:py-1 rounded border border-slate-700 whitespace-nowrap shrink-0 tabular-nums">
               <span className="text-slate-400">STA:</span>
-              <span className="font-mono font-bold text-sky-400 text-xs sm:text-sm">
+              <span className="font-mono font-bold text-sky-400">
                 {formatSTA(currentSta)}
               </span>
-              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
+              <span className="text-[10px] font-mono text-slate-400">
                 / {formatSTA(Math.max(1, Math.round(currentRuas.panjangKm * 1000)))}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-700">
+            <div className="flex items-center gap-1 bg-slate-800/90 px-2 py-0.5 sm:py-1 rounded border border-slate-700 whitespace-nowrap shrink-0 tabular-nums">
               {useSimulationDriving && simulationMode === 'walking' ? (
-                <Footprints className="w-3.5 h-3.5 text-emerald-400" />
+                <Footprints className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
               ) : useSimulationDriving && simulationMode === 'motorcycle' ? (
-                <Bike className="w-3.5 h-3.5 text-sky-400" />
+                <Bike className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-400 shrink-0" />
               ) : useSimulationDriving ? (
-                <Gauge className="w-3.5 h-3.5 text-amber-400" />
+                <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
               ) : (
-                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
               )}
               <span className="font-mono font-bold text-white">
-                {vehicleSpeedKmh} km/jam
-              </span>
-              <span className="text-[10px] text-slate-400 hidden sm:inline">
-                (
-                {useSimulationDriving
-                  ? simulationMode === 'walking'
-                    ? 'Simulasi Jalan Kaki'
-                    : simulationMode === 'motorcycle'
-                      ? 'Simulasi Motor'
-                      : 'Simulasi Mobil'
-                  : 'GPS Nyata'}
-                )
+                {vehicleSpeedKmh} km/j
               </span>
             </div>
 
-            {/* Video Recording Status Badge in top bar (not blocking camera) */}
             {isRecordingVideo && (
-              <div className="flex items-center gap-1.5 bg-rose-600 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-rose-400 text-white font-bold text-[11px] sm:text-xs animate-pulse">
-                <div className="w-2 h-2 rounded-full bg-white" />
-                <span>MEREKAM ({videoElapsedSec}s)</span>
+              <div className="flex items-center gap-1 bg-rose-600 px-2 py-0.5 sm:py-1 rounded border border-rose-400 text-white font-bold text-[10px] sm:text-xs whitespace-nowrap shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span>REC {videoElapsedSec}s</span>
               </div>
             )}
-          </div>
 
-          {/* Geotagging GPS */}
-          <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[10px] sm:text-[11px] bg-slate-950/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-800">
-            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400 shrink-0" />
-            <span>
-              {currentCoord.lat.toFixed(6)}°, {currentCoord.lng.toFixed(6)}°
-            </span>
-            <span className="text-slate-500">|</span>
-            <span className="text-slate-400">Alt: {currentCoord.altitude.toFixed(0)}m</span>
-            <span className="text-slate-500">|</span>
-            <span className="text-emerald-400">±{currentCoord.accuracy.toFixed(1)}m</span>
+            <div className="flex items-center gap-1 text-slate-300 font-mono text-[10px] bg-slate-950/60 px-2 py-0.5 sm:py-1 rounded border border-slate-800 whitespace-nowrap shrink-0 tabular-nums">
+              <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+              <span>
+                {currentCoord.lat.toFixed(5)}°, {currentCoord.lng.toFixed(5)}°
+              </span>
+              <span className="text-slate-500">·</span>
+              <span className="text-emerald-400">±{currentCoord.accuracy.toFixed(1)}m</span>
+            </div>
           </div>
         </div>
 
         {/* Row 2: 100m Auto-Capture Progress Bar & Real-time AI Status */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 items-center text-[11px] sm:text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-1 sm:gap-2 items-center text-[10px] sm:text-xs">
           {/* 100m Auto-Capture Progress bar */}
-          <div className="md:col-span-6 flex items-center gap-2 sm:gap-3 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-slate-800">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Camera className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-semibold text-slate-200">
-                Odometer 100m:
-              </span>
+          <div className="md:col-span-5 flex items-center gap-2 bg-slate-950/70 px-2 sm:px-2.5 py-1 rounded border border-slate-800">
+            <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
+              <Camera className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
+              <span className="font-semibold text-slate-200">Odo 100m:</span>
             </div>
 
-            <div className="flex-1 bg-slate-800 h-2 sm:h-2.5 rounded-full overflow-hidden relative">
-              <div 
+            <div className="flex-1 bg-slate-800 h-2 rounded-full overflow-hidden relative min-w-[48px]">
+              <div
                 className={`h-full transition-all duration-300 ${
-                  progressPercent >= 90 ? 'bg-amber-400 animate-pulse' : 'bg-sky-500'
+                  progressPercent >= 90 ? 'bg-amber-400' : 'bg-sky-500'
                 }`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            <span className="font-mono text-amber-300 text-[11px] sm:text-xs font-semibold shrink-0">
-              {Math.round(distanceSinceLastCapture)}m / 100m
+            <span className="font-mono text-amber-300 font-semibold whitespace-nowrap shrink-0 tabular-nums">
+              {Math.round(distanceSinceLastCapture)}m/100m
             </span>
           </div>
 
-          {/* Real-time AI Detection Status banner (Interactive Active Controls) */}
-          <div className="md:col-span-6 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-slate-800">
-            <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
+          {/* Real-time AI Detection & Camera Quick Controls (single line) */}
+          <div className="md:col-span-7 flex items-center justify-between gap-1.5 bg-slate-950/70 px-2 sm:px-2.5 py-1 rounded border border-slate-800 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 min-w-0 shrink-0">
               <button
                 type="button"
                 onClick={() => setAiDetectionEnabled((prev) => !prev)}
                 title={aiDetectionEnabled ? 'Deteksi AI Aktif (klik untuk nonaktifkan)' : 'Deteksi AI Nonaktif (klik untuk aktifkan)'}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-bold transition shrink-0 cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
                   aiDetectionEnabled
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    aiDetectionEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
                 <Eye className="w-3 h-3 shrink-0" />
-                <span>{aiDetectionEnabled ? 'Deteksi AI: Aktif' : 'Deteksi AI: Nonaktif'}</span>
+                <span>{aiDetectionEnabled ? 'AI: Aktif' : 'AI: Off'}</span>
               </button>
 
               {!aiDetectionEnabled ? (
-                <span className="text-slate-500 truncate text-[11px]">
-                  Dinonaktifkan
+                <span className="text-slate-500 truncate max-w-[90px] sm:max-w-[160px] text-[10px]">
+                  Nonaktif
                 </span>
               ) : isScanningLiveAI ? (
-                <span className="font-medium text-amber-300 truncate flex items-center gap-1">
+                <span className="font-medium text-amber-300 flex items-center gap-1 whitespace-nowrap">
                   <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                  <span>Memindai jalan...</span>
+                  <span>Memindai...</span>
                 </span>
               ) : detectedDefects.length > 0 ? (
                 <span
-                  className="font-semibold text-rose-400 truncate flex items-center gap-1"
+                  className="font-semibold text-rose-400 truncate max-w-[110px] sm:max-w-[200px] flex items-center gap-1"
                   title={aiLastSummary || `${detectedDefects[0].type} (${detectedDefects[0].severity})`}
                 >
                   <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
-                  <span className="truncate">
-                    {detectedDefects[0].type} ({detectedDefects[0].severity})
-                  </span>
+                  <span className="truncate">{detectedDefects[0].type}</span>
                 </span>
               ) : (
                 <span
-                  className="font-medium text-emerald-400 truncate flex items-center gap-1"
-                  title={aiLastSummary || 'Permukaan Mantap PKRMS'}
+                  className="font-medium text-emerald-400 truncate max-w-[110px] sm:max-w-[200px] flex items-center gap-1"
+                  title={aiLastSummary || 'Mantap PKRMS'}
                 >
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="truncate">
-                    {aiLastSummary ? aiLastSummary : 'Permukaan Mantap PKRMS'}
-                  </span>
+                  <span className="truncate">{aiLastSummary || 'Mantap PKRMS'}</span>
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               {aiDetectionEnabled && (
                 <button
                   type="button"
                   onClick={() => void runLiveAiFrameScan({ silent: false })}
                   disabled={isScanningLiveAI}
                   title="Pindai kondisi jalan pada tampilan kamera saat ini menggunakan AI"
-                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 text-[11px] font-bold transition cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 text-[10px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {isScanningLiveAI ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                   ) : (
-                    <Sparkles className="w-3 h-3" />
+                    <Sparkles className="w-3 h-3 shrink-0" />
                   )}
-                  <span>Pindai AI</span>
+                  <span>Pindai</span>
                 </button>
               )}
 
@@ -2283,7 +2389,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                     ? 'Kamera Fisik Aktif (klik untuk beralih ke Kamera Simulasi)'
                     : cameraError || 'Klik untuk mengaktifkan Kamera Fisik perangkat'
                 }
-                className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-semibold transition cursor-pointer disabled:opacity-60 ${
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60 ${
                   cameraActive
                     ? 'bg-sky-500/15 border-sky-500/40 text-sky-300 hover:bg-sky-500/25'
                     : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-amber-500/50'
@@ -2295,7 +2401,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                     ? 'Mengaktifkan...'
                     : cameraActive
                       ? 'Kamera Fisik'
-                      : 'Kamera Simulasi'}
+                      : 'Simulasi'}
                 </span>
               </button>
 
@@ -2309,13 +2415,13 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                     )
                   }
                   title={androidCameraSettings.torch ? 'Matikan Lampu Flash' : 'Nyalakan Lampu Flash'}
-                  className={`p-1 rounded border cursor-pointer transition ${
+                  className={`p-1 rounded border cursor-pointer transition shrink-0 ${
                     androidCameraSettings.torch
                       ? 'bg-amber-500 border-amber-400 text-slate-950'
                       : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
-                  <Flashlight className="w-3.5 h-3.5" />
+                  <Flashlight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </button>
               )}
 
@@ -2325,8 +2431,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                   void refreshCameraDevices();
                   setShowCameraSettingsModal(true);
                 }}
-                title="Setelan Kamera Android (Fokus, Frame Rate 30fps, Anti-Getar, Lensa)"
-                className="flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 hover:border-sky-500/50 text-slate-200 text-[10px] font-semibold transition cursor-pointer"
+                title="Setelan Kamera Android (Fokus, Frame Rate, Anti-Getar, Lensa)"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 hover:border-sky-500/50 text-slate-200 text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Settings2 className="w-3 h-3 text-sky-400 shrink-0" />
                 <span className="hidden md:inline">Setelan Android</span>
@@ -2337,50 +2443,44 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                   type="button"
                   onClick={onOpenStorageSettings}
                   title="Pengaturan Penyimpanan Foto & Video pada Perangkat"
-                  className="flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 hover:border-emerald-500/50 text-emerald-300 text-[10px] font-semibold transition cursor-pointer"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 hover:border-emerald-500/50 text-emerald-300 text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <HardDrive className="w-3 h-3 text-emerald-400 shrink-0" />
                   <span className="hidden md:inline">Penyimpanan</span>
                 </button>
               )}
 
-              {/* Audio Alert Toggle */}
               <button
                 type="button"
                 onClick={() => setAudioAlertsEnabled(!audioAlertsEnabled)}
                 title={audioAlertsEnabled ? 'Alarm Suara Aktif' : 'Alarm Suara Dimatikan'}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 cursor-pointer"
               >
                 {audioAlertsEnabled ? (
-                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
                 ) : (
-                  <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                  <VolumeX className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />
                 )}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Row 3: GPS Route Tracker (100m), Non-100m STA Akhir Input & Export Excel / KML / KMZ */}
-        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-slate-950/75 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-cyan-500/30 text-[11px] sm:text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
-              <Route className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span>Tracker Rute GPS:</span>
-              <span className="font-mono bg-cyan-500/15 border border-cyan-500/30 px-1.5 py-0.5 rounded text-[11px]">
-                {gpsTrackPoints.length} titik (
-                {gpsTrackPoints.filter((p) => p.category === 'checkpoint_100m' || p.category === 'start' || p.category === 'final_sta').length} STA)
-              </span>
-              <span
-                className="font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded text-[11px]"
-                title="Panjang ruas jalan otomatis dihitung dan disimpan sesuai jarak tempuh saat survei berhenti"
-              >
-                Terukur: {((currentSta > 0 ? currentSta : Math.round(currentRuas.panjangKm * 1000)) / 1000).toFixed(3)} km
+        {/* Row 3: GPS Route Tracker & Export (tidy single-line horizontal rows) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 bg-slate-950/75 px-2 sm:px-3 py-1 rounded border border-cyan-500/30 text-[10px] sm:text-xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 text-cyan-300 font-semibold whitespace-nowrap shrink-0 tabular-nums">
+              <Route className="w-3 h-3 text-cyan-400 shrink-0" />
+              <span>
+                GPS: {gpsTrackPoints.length} ttk (
+                {gpsTrackPoints.filter((p) => p.category === 'checkpoint_100m' || p.category === 'start' || p.category === 'final_sta').length}{' '}
+                STA) ·{' '}
+                {((currentSta > 0 ? currentSta : Math.round(currentRuas.panjangKm * 1000)) / 1000).toFixed(3)} km
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
-              <span className="text-[11px] text-slate-400">STA Akhir (m):</span>
+            <div className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap shrink-0">
+              <span className="text-slate-400">Akhir(m):</span>
               <input
                 type="number"
                 step="1"
@@ -2393,69 +2493,66 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                     handleApplyTargetEndSta();
                   }
                 }}
-                className="w-20 bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-cyan-400"
-                title="Input STA Akhir dalam meter (mendukung angka non-kelipatan 100m, contoh: 1235)"
+                className="w-14 sm:w-16 bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white font-mono text-[10px] focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                title="Input STA Akhir dalam meter (mendukung angka non-kelipatan 100m)"
               />
-              <span className="text-[10px] font-mono text-sky-400 hidden sm:inline">
-                {formatSTA(Math.max(1, Math.round(Number(customEndStaInput) || 0)))}
-              </span>
               <button
                 type="button"
                 onClick={handleApplyTargetEndSta}
-                className="px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold transition cursor-pointer"
-                title="Terapkan target STA Akhir (bisa non-kelipatan 100m) ke ruas jalan ini"
+                className="px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer"
+                title="Terapkan target STA Akhir ke ruas jalan ini"
               >
-                Set STA
+                Set
               </button>
               <button
                 type="button"
                 onClick={handleRecordFinalStaNow}
-                className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition cursor-pointer"
-                title="Catat STA Akhir GPS sekarang (menggunakan STA berjalan atau nilai STA Akhir di samping)"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer"
+                title="Catat STA Akhir GPS sekarang"
               >
-                <Flag className="w-2.5 h-2.5" />
-                <span>Catat STA Akhir</span>
+                <Flag className="w-2.5 h-2.5 shrink-0" />
+                <span>Catat Akhir</span>
               </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0">
             {gpsTrackPoints.length >= 2 && (
               <button
                 type="button"
                 onClick={handleApplyGpsTrackToRuasGeometry}
-                className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-[11px] font-bold transition cursor-pointer"
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-[10px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer"
                 title="Terapkan jalur rute hasil GPS Tracker menjadi rute resmi ruas jalan di peta"
               >
-                <MapPin className="w-3 h-3" />
+                <MapPin className="w-3 h-3 shrink-0" />
                 <span>Terapkan ke Peta</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => exportGpsTracksToExcel(ruasList, currentRuas)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 text-[11px] font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer"
               title="Ekspor hasil GPS Tracker ruas ini ke file Excel (.xlsx)"
             >
-              <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+              <FileSpreadsheet className="w-3 h-3 text-emerald-400 shrink-0" />
               <span>Excel</span>
             </button>
             <button
               type="button"
               onClick={() => exportGpsTracksToKML(ruasList, currentRuas)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-[11px] font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer"
               title="Ekspor hasil GPS Tracker ruas ini ke file KML"
             >
-              <FileCode className="w-3 h-3 text-sky-400" />
+              <FileCode className="w-3 h-3 text-sky-400 shrink-0" />
               <span>KML</span>
             </button>
             <button
               type="button"
               onClick={() => void exportGpsTracksToKMZ(ruasList, currentRuas)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 text-[11px] font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 text-[10px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer"
               title="Ekspor hasil GPS Tracker ruas ini ke file KMZ"
             >
-              <Route className="w-3 h-3 text-indigo-400" />
+              <Route className="w-3 h-3 text-indigo-400 shrink-0" />
               <span>KMZ</span>
             </button>
           </div>
@@ -2467,7 +2564,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         MAIN CAMERA / VIDEO VIEWPORT:
         100% BERSIH DARI TULISAN - Bebas dari tulisan overlay sehingga tidak menutupi display kamera
       */}
-      <div className="relative flex-1 min-h-[230px] sm:min-h-[300px] bg-black overflow-hidden flex items-center justify-center">
+      <div className="relative flex-1 min-h-[210px] sm:min-h-[300px] bg-black overflow-hidden flex items-center justify-center">
         {/* Real Camera Video Element */}
         <video
           ref={videoRef}
@@ -2484,8 +2581,10 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           <div className="w-full h-full">
             <SimulatedRoadCanvas 
               defects={detectedDefects} 
+              defectsRef={detectedDefectsRef}
               isMoving={isSurveyRunning && !isSurveyPaused} 
-              speed={vehicleSpeedKmh} 
+              speed={vehicleSpeedKmh}
+              speedRef={vehicleSpeedRef}
               batterySaver={batterySaver}
               isRecordingVideo={isRecordingVideo}
             />
@@ -2502,7 +2601,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           <button
             type="button"
             onClick={handleTogglePauseSurvey}
-            className={`flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer ${
+            className={`flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition whitespace-nowrap cursor-pointer ${
               isSurveyPaused
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
@@ -2510,12 +2609,12 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           >
             {isSurveyPaused ? (
               <>
-                <Play className="w-4 h-4 fill-current" />
+                <Play className="w-4 h-4 fill-current shrink-0" />
                 <span>Lanjutkan</span>
               </>
             ) : (
               <>
-                <Pause className="w-4 h-4 fill-current" />
+                <Pause className="w-4 h-4 fill-current shrink-0" />
                 <span>Pause</span>
               </>
             )}
@@ -2524,24 +2623,24 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           <button
             type="button"
             onClick={handleStopAutoSurvey}
-            className="flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer"
+            className="flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm shadow-lg transition whitespace-nowrap cursor-pointer"
           >
-            <Square className="w-4 h-4 fill-current" />
+            <Square className="w-4 h-4 fill-current shrink-0" />
             <span>Berhenti</span>
           </button>
         </div>
       ) : (
-      <div className="bg-slate-900 border-t border-slate-800 p-2.5 sm:p-3 shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+      <div className="bg-slate-900 border-t border-slate-800 px-2.5 py-2 sm:p-3 shrink-0">
+        <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
           {/* Survey Execution & Separated Photo/Video Feature Mode */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2">
             {!isSurveyRunning ? (
               <button
                 type="button"
                 onClick={handleStartAutoSurvey}
-                className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Play className="w-4 h-4 fill-current" />
+                <Play className="w-4 h-4 fill-current shrink-0" />
                 <span>
                   {currentSta >= Math.max(1, Math.round(currentRuas.panjangKm * 1000))
                     ? 'Ulangi Survei Otomatis'
@@ -2552,240 +2651,186 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               <button
                 type="button"
                 onClick={handleStopAutoSurvey}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md transition cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm shadow-md transition whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Square className="w-4 h-4 fill-current" />
+                <Square className="w-4 h-4 fill-current shrink-0" />
                 <span>Hentikan Survei</span>
               </button>
             )}
 
-            {/* Toggle Fitur Foto & Fitur Video (Dapat Aktif Bersamaan Saat Survei Otomatis) */}
-            <div className="flex items-center rounded-lg bg-slate-950 p-1 border border-slate-700 gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !autoCaptureEnabled;
-                  autoCaptureEnabledRef.current = next;
-                  setAutoCaptureEnabled(next);
-                }}
-                title={autoCaptureEnabled ? 'Fitur Foto 100m Aktif (klik untuk nonaktifkan)' : 'Fitur Foto Nonaktif (klik untuk aktifkan)'}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
-                  autoCaptureEnabled
-                    ? 'bg-amber-500 text-slate-950 shadow'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    autoCaptureEnabled ? 'bg-slate-950 animate-pulse' : 'bg-slate-600'
+            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar">
+              {/* Toggle Fitur Foto & Fitur Video */}
+              <div className="flex items-center rounded-lg bg-slate-950 p-0.5 border border-slate-700 gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !autoCaptureEnabled;
+                    autoCaptureEnabledRef.current = next;
+                    setAutoCaptureEnabled(next);
+                  }}
+                  title={autoCaptureEnabled ? 'Fitur Foto 100m Aktif (klik untuk nonaktifkan)' : 'Fitur Foto Nonaktif (klik untuk aktifkan)'}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                    autoCaptureEnabled
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
                   }`}
-                />
-                <Camera className="w-3.5 h-3.5" />
-                <span>Fitur Foto</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !videoFeatureEnabled;
-                  videoFeatureEnabledRef.current = next;
-                  setVideoFeatureEnabled(next);
-                  if (!next && isRecordingVideoRef.current) {
-                    void stopAndSaveVideoRecording();
-                  } else if (next && isSurveyRunning && !isRecordingVideoRef.current) {
-                    startVideoRecording();
-                  }
-                }}
-                title={videoFeatureEnabled ? 'Fitur Video Aktif (klik untuk nonaktifkan)' : 'Fitur Video Nonaktif (klik untuk aktifkan)'}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer ${
-                  videoFeatureEnabled || isRecordingVideo
-                    ? 'bg-rose-600 text-white shadow'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isRecordingVideo
-                      ? 'bg-white animate-ping'
-                      : videoFeatureEnabled
-                        ? 'bg-emerald-300'
-                        : 'bg-slate-600'
+                >
+                  <Camera className="w-3.5 h-3.5 shrink-0" />
+                  <span>Fitur Foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !videoFeatureEnabled;
+                    videoFeatureEnabledRef.current = next;
+                    setVideoFeatureEnabled(next);
+                    if (!next && isRecordingVideoRef.current) {
+                      void stopAndSaveVideoRecording();
+                    } else if (next && isSurveyRunning && !isRecordingVideoRef.current) {
+                      startVideoRecording();
+                    }
+                  }}
+                  title={videoFeatureEnabled ? 'Fitur Video Aktif (klik untuk nonaktifkan)' : 'Fitur Video Nonaktif (klik untuk aktifkan)'}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                    videoFeatureEnabled || isRecordingVideo
+                      ? 'bg-rose-600 text-white shadow'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
                   }`}
-                />
-                <Video className="w-3.5 h-3.5" />
-                <span>Fitur Video</span>
-              </button>
-            </div>
+                >
+                  <Video className="w-3.5 h-3.5 shrink-0" />
+                  <span>Fitur Video</span>
+                </button>
+              </div>
 
-            {(videoFeatureEnabled || isRecordingVideo) && (
-              <button
-                type="button"
-                onClick={handleToggleVideoRecord}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition cursor-pointer ${
-                  isRecordingVideo
-                    ? 'bg-rose-600 text-white animate-pulse'
-                    : 'bg-rose-950 hover:bg-rose-900 text-rose-100 border border-rose-500/50'
-                }`}
-              >
-                <Video className="w-4 h-4" />
-                <span>{isRecordingVideo ? `Stop & Simpan (${videoElapsedSec}s)` : 'Rekam Video Survei'}</span>
-              </button>
-            )}
+              {(videoFeatureEnabled || isRecordingVideo) && (
+                <button
+                  type="button"
+                  onClick={handleToggleVideoRecord}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] sm:text-xs transition whitespace-nowrap shrink-0 cursor-pointer ${
+                    isRecordingVideo
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-rose-950 hover:bg-rose-900 text-rose-100 border border-rose-500/50'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5 shrink-0" />
+                  <span>{isRecordingVideo ? `Stop (${videoElapsedSec}s)` : 'Rekam Video'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Right controls: Last captured photo & video previews + simulation settings */}
-          <div className="flex items-center flex-wrap gap-3 text-xs">
-            {lastCapturedPhoto && (
-              <div className="flex items-center gap-2 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                <img 
-                  src={lastCapturedPhoto.imageUrl} 
-                  alt="Foto Terakhir" 
-                  className="w-10 h-7 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-90"
-                  onClick={() => onViewPhoto(lastCapturedPhoto)}
-                />
-                <div className="text-[11px]">
-                  <span className="text-slate-400 block text-[10px]">Foto 100m Terakhir:</span>
-                  <span className="font-mono text-amber-400 font-bold">{lastCapturedPhoto.staText}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onViewPhoto(lastCapturedPhoto)}
-                  className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-semibold rounded cursor-pointer"
-                >
-                  Lihat
-                </button>
-              </div>
-            )}
+          {/* Right controls: Transport mode + previews */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
+            {/* Simulation & Real GPS Transport Mode Controls */}
+            <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setUseSimulationDriving(false)}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] sm:text-[11px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                  !useSimulationDriving
+                    ? 'bg-emerald-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Gunakan Kecepatan & Pergerakan GPS Nyata Perangkat"
+              >
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span>GPS Nyata</span>
+              </button>
 
-            {lastRecordedVideo && (
-              <div className="flex items-center gap-2 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-rose-500/30">
-                {lastRecordedVideo.thumbnailUrl ? (
-                  <img
-                    src={lastRecordedVideo.thumbnailUrl}
-                    alt="Video Terakhir"
-                    className="w-10 h-7 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-90"
-                    onClick={() => onViewVideo?.(lastRecordedVideo)}
-                  />
-                ) : (
-                  <div className="w-10 h-7 rounded border border-slate-700 bg-slate-900 flex items-center justify-center text-rose-400">
-                    <Video className="w-3.5 h-3.5" />
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSimulationDriving(true);
+                  setSimulationMode('car');
+                }}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] sm:text-[11px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                  useSimulationDriving && simulationMode === 'car'
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Simulasi Survei Menggunakan Mobil"
+              >
+                <Car className="w-3 h-3 shrink-0" />
+                <span>Mobil</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSimulationDriving(true);
+                  setSimulationMode('motorcycle');
+                }}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] sm:text-[11px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                  useSimulationDriving && simulationMode === 'motorcycle'
+                    ? 'bg-sky-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Simulasi Survei Menggunakan Sepeda Motor"
+              >
+                <Bike className="w-3 h-3 shrink-0" />
+                <span>Motor</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSimulationDriving(true);
+                  setSimulationMode('walking');
+                }}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] sm:text-[11px] font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
+                  useSimulationDriving && simulationMode === 'walking'
+                    ? 'bg-emerald-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Simulasi Survei Jalan Kaki"
+              >
+                <Footprints className="w-3 h-3 shrink-0" />
+                <span>Jalan Kaki</span>
+              </button>
+            </div>
+
+            {(lastCapturedPhoto || lastRecordedVideo) && (
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {lastCapturedPhoto && (
+                  <div className="flex items-center gap-1.5 bg-slate-950/80 px-2 py-1 rounded-lg border border-slate-800 shrink-0">
+                    <img
+                      src={lastCapturedPhoto.imageUrl}
+                      alt="Foto Terakhir"
+                      className="w-8 h-6 object-cover rounded border border-slate-700 cursor-pointer"
+                      onClick={() => onViewPhoto(lastCapturedPhoto)}
+                    />
+                    <span className="font-mono text-amber-400 font-bold text-[10px] whitespace-nowrap">
+                      {lastCapturedPhoto.staText}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onViewPhoto(lastCapturedPhoto)}
+                      className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-semibold rounded whitespace-nowrap cursor-pointer"
+                    >
+                      Lihat
+                    </button>
                   </div>
                 )}
-                <div className="text-[11px]">
-                  <span className="text-slate-400 block text-[10px]">Arsip Ruas {lastRecordedVideo.nomorRuas}:</span>
-                  <span className="font-mono text-rose-300 font-bold">
-                    {formatSTA(lastRecordedVideo.startSta)} - {formatSTA(lastRecordedVideo.endSta)}
-                  </span>
-                </div>
-                {onViewVideo && (
-                  <button
-                    type="button"
-                    onClick={() => onViewVideo(lastRecordedVideo)}
-                    className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-[10px] font-semibold rounded cursor-pointer"
-                  >
-                    Lihat
-                  </button>
+
+                {lastRecordedVideo && (
+                  <div className="flex items-center gap-1.5 bg-slate-950/80 px-2 py-1 rounded-lg border border-rose-500/30 shrink-0">
+                    <Video className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    <span className="font-mono text-rose-300 font-bold text-[10px] whitespace-nowrap">
+                      {formatSTA(lastRecordedVideo.startSta)}-{formatSTA(lastRecordedVideo.endSta)}
+                    </span>
+                    {onViewVideo && (
+                      <button
+                        type="button"
+                        onClick={() => onViewVideo(lastRecordedVideo)}
+                        className="px-1.5 py-0.5 bg-rose-500/20 text-rose-200 text-[10px] font-semibold rounded whitespace-nowrap cursor-pointer"
+                      >
+                        Lihat
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
-
-            {/* Simulation & Real GPS Transport Mode Controls */}
-            <div className="flex items-center flex-wrap gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useSimulationDriving}
-                  onChange={(e) => setUseSimulationDriving(e.target.checked)}
-                  className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                />
-                <span className="text-slate-300 font-medium">Simulasi:</span>
-              </label>
-
-              <div className="flex items-center rounded-md bg-slate-900/90 p-0.5 border border-slate-700/80 gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setUseSimulationDriving(false)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
-                    !useSimulationDriving
-                      ? 'bg-emerald-500 text-slate-950 shadow'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="Gunakan Kecepatan & Pergerakan GPS Nyata Perangkat (0 km/jam saat tidak bergerak)"
-                >
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>GPS Nyata</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseSimulationDriving(true);
-                    setSimulationMode('car');
-                  }}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
-                    useSimulationDriving && simulationMode === 'car'
-                      ? 'bg-amber-500 text-slate-950 shadow'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="Simulasi Survei Menggunakan Mobil"
-                >
-                  <Car className="w-3.5 h-3.5" />
-                  <span>Mobil</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseSimulationDriving(true);
-                    setSimulationMode('motorcycle');
-                  }}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
-                    useSimulationDriving && simulationMode === 'motorcycle'
-                      ? 'bg-sky-500 text-slate-950 shadow'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="Simulasi Survei Menggunakan Sepeda Motor"
-                >
-                  <Bike className="w-3.5 h-3.5" />
-                  <span>Sepeda Motor</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseSimulationDriving(true);
-                    setSimulationMode('walking');
-                  }}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
-                    useSimulationDriving && simulationMode === 'walking'
-                      ? 'bg-emerald-500 text-slate-950 shadow'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="Simulasi Survei Jalan Kaki"
-                >
-                  <Footprints className="w-3.5 h-3.5" />
-                  <span>Jalan Kaki</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Automatic Speed Readout (Dihitung Otomatis dari GPS/Odometer) */}
-            <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-              <Gauge className="w-4 h-4 text-sky-400" />
-              <span className="text-slate-400">Kecepatan Otomatis:</span>
-              <span className="font-mono font-bold text-amber-300">
-                {vehicleSpeedKmh} km/jam
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-              <span className="text-slate-400">Auto 100m:</span>
-              <input
-                type="checkbox"
-                checked={autoCaptureEnabled}
-                onChange={(e) => setAutoCaptureEnabled(e.target.checked)}
-                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -2814,27 +2859,42 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 // Simulation Road Canvas Component (memoized to avoid re-renders on telemetry updates)
 const SimulatedRoadCanvas: React.FC<{
   defects: DefectItem[];
+  defectsRef?: React.MutableRefObject<DefectItem[]>;
   isMoving: boolean;
   speed: number;
+  speedRef?: React.MutableRefObject<number>;
   batterySaver: boolean;
   isRecordingVideo: boolean;
-}> = React.memo(({ defects, isMoving, speed, batterySaver, isRecordingVideo }) => {
+}> = React.memo(({ defects, defectsRef, isMoving, speed, speedRef, batterySaver, isRecordingVideo }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<number>(0);
-  const latestPropsRef = useRef({ defects, isMoving, speed, batterySaver, isRecordingVideo });
+  const latestPropsRef = useRef({
+    defects,
+    defectsRef,
+    isMoving,
+    speed,
+    speedRef,
+    batterySaver,
+    isRecordingVideo,
+  });
   const isCompactCanvas = typeof window !== 'undefined' && window.innerWidth <= 480;
 
   useEffect(() => {
-    latestPropsRef.current = { defects, isMoving, speed, batterySaver, isRecordingVideo };
-  }, [defects, isMoving, speed, batterySaver, isRecordingVideo]);
+    latestPropsRef.current = {
+      defects,
+      defectsRef,
+      isMoving,
+      speed,
+      speedRef,
+      batterySaver,
+      isRecordingVideo,
+    };
+  }, [defects, defectsRef, isMoving, speed, speedRef, batterySaver, isRecordingVideo]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx =
-      canvas.getContext('2d', { alpha: false, desynchronized: true }) ||
-      canvas.getContext('2d', { alpha: false }) ||
-      canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false }) || canvas.getContext('2d');
     if (!ctx) return;
 
     let animId = 0;
@@ -2845,14 +2905,19 @@ const SimulatedRoadCanvas: React.FC<{
     const render = (nowMs: number) => {
       if (!active) return;
       const {
-        defects: curDefects,
+        defects: curDefectsProp,
+        defectsRef: curDefectsRef,
         isMoving: curMoving,
-        speed: curSpeed,
+        speed: curSpeedProp,
+        speedRef: curSpeedRef,
         batterySaver: curBattery,
         isRecordingVideo: curRecording,
       } = latestPropsRef.current;
 
-      const minGapMs = curBattery ? 66 : curRecording ? 45 : 0;
+      const curDefects = curDefectsRef ? curDefectsRef.current : curDefectsProp;
+      const curSpeed = curSpeedRef ? curSpeedRef.current : curSpeedProp;
+
+      const minGapMs = curBattery ? 66 : curRecording ? 45 : 32;
       if (minGapMs > 0 && lastThrottledRenderMs > 0 && nowMs - lastThrottledRenderMs < minGapMs) {
         animId = requestAnimationFrame(render);
         return;
@@ -2889,8 +2954,8 @@ const SimulatedRoadCanvas: React.FC<{
   return (
     <canvas
       ref={canvasRef}
-      width={isCompactCanvas ? 854 : 1280}
-      height={isCompactCanvas ? 480 : 720}
+      width={isCompactCanvas ? 640 : 1280}
+      height={isCompactCanvas ? 360 : 720}
       className="w-full h-full object-cover"
     />
   );

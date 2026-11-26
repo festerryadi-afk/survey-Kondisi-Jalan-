@@ -137,18 +137,18 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl sm:rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Modal Header with Mentawai Logo */}
-        <div className="bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-auto shrink-0 flex items-center justify-center filter drop-shadow">
-              <MentawaiLogo className="h-12 w-auto max-w-[44px]" />
+        <div className="bg-slate-950 px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-10 sm:h-12 w-auto shrink-0 flex items-center justify-center filter drop-shadow">
+              <MentawaiLogo className="h-10 sm:h-12 w-auto max-w-[38px] sm:max-w-[44px]" />
             </div>
-            <div>
-              <h3 className="font-bold text-white text-base sm:text-lg">
+            <div className="min-w-0">
+              <h3 className="font-bold text-white text-sm sm:text-lg truncate">
                 Download &amp; Pasang APK Siap Pakai
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400">
                 Pemasangan aplikasi survei DPUPR Mentawai di smartphone Android
               </p>
             </div>
@@ -156,14 +156,14 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-300">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 text-xs text-slate-300">
           {/* Main Action Banner */}
           <div className="bg-gradient-to-br from-amber-500/15 via-slate-900 to-slate-950 p-4 rounded-2xl border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>

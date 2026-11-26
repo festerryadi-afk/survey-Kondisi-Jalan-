@@ -212,7 +212,7 @@ export const PublishDataModal: React.FC<PublishDataModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-300">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 text-xs text-slate-300">
           {/* App Icon Preview + PWA Install */}
           <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">

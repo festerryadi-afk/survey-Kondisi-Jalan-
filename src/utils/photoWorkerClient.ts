@@ -74,6 +74,7 @@ export async function runPhotoEncodeInWorker(
     bitmap?: ImageBitmap;
     useSimulation?: boolean;
     defects?: DefectItem[];
+    compactMode?: boolean;
     watermark: PhotoEncodeWorkerRequest['watermark'];
   }
 ): Promise<{ hd600DpiDataUrl: string; storageDataUrl: string } | null> {
@@ -106,10 +107,11 @@ export async function runPhotoEncodeInWorker(
       bitmap: params.bitmap,
       useSimulation: params.useSimulation,
       defects: params.defects,
-      hdWidth: PHOTO_3R_HD_WIDTH,
-      hdHeight: PHOTO_3R_HD_HEIGHT,
-      storageWidth: PHOTO_3R_STORAGE_WIDTH,
-      storageHeight: PHOTO_3R_STORAGE_HEIGHT,
+      hdWidth: params.compactMode ? 1280 : PHOTO_3R_HD_WIDTH,
+      hdHeight: params.compactMode ? 896 : PHOTO_3R_HD_HEIGHT,
+      storageWidth: params.compactMode ? 1280 : PHOTO_3R_STORAGE_WIDTH,
+      storageHeight: params.compactMode ? 896 : PHOTO_3R_STORAGE_HEIGHT,
+      compactMode: Boolean(params.compactMode),
       watermark: params.watermark,
     };
 

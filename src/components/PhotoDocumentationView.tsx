@@ -196,49 +196,49 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
   };
 
   return (
-    <div className="flex-1 bg-slate-950 text-slate-100 p-4 sm:p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="flex-1 bg-slate-950 text-slate-100 p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-3 sm:pb-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-sky-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <ImageIcon className="w-5 h-5 text-sky-400 shrink-0" />
+              <h2 className="text-base sm:text-xl font-bold text-white tracking-tight">
                 Dokumentasi Foto Lapangan (*.JPG)
               </h2>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-[11px] sm:text-sm text-slate-400 mt-1">
               Arsip &amp; impor foto geotagging resolusi HD 600 DPI ukuran cetak 3R (8,9 × 12,7 cm) per ruas jalan Kabupaten Kepulauan Mentawai.
             </p>
           </div>
 
           {/* Export & AI Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             {onOpenStorageSettings && (
               <button
                 type="button"
                 onClick={onOpenStorageSettings}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 font-semibold text-xs shadow-md transition cursor-pointer"
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 font-semibold text-[11px] sm:text-xs whitespace-nowrap shadow-md transition cursor-pointer"
                 title="Atur lokasi & kualitas penyimpanan foto pada perangkat"
               >
-                <HardDrive className="w-4 h-4 text-emerald-400" />
-                <span>Pengaturan Penyimpanan</span>
+                <HardDrive className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">Penyimpanan</span>
               </button>
             )}
             <button
               type="button"
               onClick={handleBatchDetectAI}
               disabled={isBatchAnalyzing || analyzingPhotoId !== null}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition disabled:opacity-60 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] sm:text-xs whitespace-nowrap shadow-md transition disabled:opacity-60 cursor-pointer"
               title="Deteksi otomatis tingkat kerusakan jalan seluruh foto menggunakan AI"
             >
               {isBatchAnalyzing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
               ) : (
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               )}
-              <span>
-                {isBatchAnalyzing ? batchProgressText || 'Menganalisis AI...' : 'Deteksi Kerusakan AI'}
+              <span className="truncate">
+                {isBatchAnalyzing ? batchProgressText || 'Menganalisis AI...' : 'Deteksi AI'}
               </span>
             </button>
 
@@ -246,21 +246,21 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
               type="button"
               onClick={handleExportPDF}
               disabled={isExportingPdf}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-200 font-semibold text-xs shadow-md transition disabled:opacity-60 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-200 font-semibold text-[11px] sm:text-xs whitespace-nowrap shadow-md transition disabled:opacity-60 cursor-pointer"
               title="Unduh Laporan Foto Dokumentasi *.PDF ukuran cetak 3R (8,9 × 12,7 cm) HD 600 DPI"
             >
-              <Printer className="w-4 h-4 text-rose-400" />
-              <span>{isExportingPdf ? 'Membuat *.PDF 600 DPI...' : 'Ekspor ke *.PDF (3R 600 DPI)'}</span>
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 shrink-0" />
+              <span className="truncate">{isExportingPdf ? 'Membuat *.PDF...' : 'Ekspor *.PDF (3R)'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportGroupedExcel}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-xs shadow-md transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-[11px] sm:text-xs whitespace-nowrap shadow-md transition cursor-pointer"
               title="Ekspor Seluruh Inventaris dan Foto ke Excel (.XLS)"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Ekspor ke Excel</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Ekspor Excel</span>
             </button>
           </div>
         </div>
@@ -300,14 +300,14 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
         )}
 
         {/* Filter Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 p-3 rounded-xl border border-slate-800 text-xs">
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400">Pilih Ruas Jalan:</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 bg-slate-900 p-2.5 sm:p-3 rounded-xl border border-slate-800 text-xs">
+          <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-slate-400 shrink-0">Ruas:</span>
             <select
               value={selectedRuasFilter}
               onChange={(e) => setSelectedRuasFilter(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none cursor-pointer"
+              className="w-full sm:w-auto min-w-0 truncate bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none cursor-pointer"
             >
               <option value="all">Semua Ruas Jalan ({ruasList.length})</option>
               {ruasList.map((r) => (
@@ -318,26 +318,26 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="text-xs font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/30 px-3 py-1 rounded-lg">
-              Total Arsip Foto: {photos.length} File (*.JPG)
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+            <div className="text-[11px] sm:text-xs font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              Total Foto: {photos.length} (*.JPG)
             </div>
             {photos.length > 0 && onDeleteAllPhotos && (
               <button
                 type="button"
                 onClick={() => setConfirmDeleteAllPhotos(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition cursor-pointer"
                 title="Hapus seluruh titik foto dokumentasi"
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>Hapus Semua Titik Foto</span>
+                <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>Hapus Semua</span>
               </button>
             )}
           </div>
         </div>
 
         {/* Grouped Road Segments Photo Section */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {groupedRuas.map(({ ruas, photos: rPhotos }) => {
             const segments = getRuasSTASegments(ruas);
 
@@ -347,14 +347,14 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
                 className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl"
               >
                 {/* Ruas Header with dedicated Impor Foto button */}
-                <div className="bg-slate-950/80 px-5 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm font-bold bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded border border-amber-500/30">
+                <div className="bg-slate-950/80 px-3 py-3 sm:px-5 sm:py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0">
+                    <span className="font-mono text-xs sm:text-sm font-bold bg-amber-500/10 text-amber-400 px-2 py-1 rounded border border-amber-500/30 whitespace-nowrap shrink-0">
                       Ruas {ruas.nomorRuas}
                     </span>
-                    <div>
-                      <h3 className="text-base font-bold text-white">{ruas.namaRuas}</h3>
-                      <p className="text-xs text-slate-400">
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{ruas.namaRuas}</h3>
+                      <p className="text-[11px] sm:text-xs text-slate-400">
                         {ruas.kecamatanPulau} • {ruas.panjangKm} km •{' '}
                         {segments.length > 0
                           ? segments
@@ -368,42 +368,42 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setImportTargetRuas(ruas)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow transition cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold whitespace-nowrap shadow transition cursor-pointer"
                       title={`Impor foto ke Ruas ${ruas.nomorRuas}`}
                     >
-                      <ImagePlus className="w-3.5 h-3.5" />
+                      <ImagePlus className="w-3.5 h-3.5 shrink-0" />
                       <span>Impor Foto</span>
                     </button>
-                    <span className="text-xs text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700">
+                    <span className="text-[11px] sm:text-xs text-slate-300 bg-slate-800/80 px-2 py-1 rounded border border-slate-700 whitespace-nowrap">
                       {segments.length} Segmen STA
                     </span>
-                    <span className="text-xs text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700">
+                    <span className="text-[11px] sm:text-xs text-slate-300 bg-slate-800/80 px-2 py-1 rounded border border-slate-700 whitespace-nowrap">
                       {rPhotos.length} Foto
                     </span>
                   </div>
                 </div>
 
-                <div className="p-5">
+                <div className="p-2.5 sm:p-5">
                   {rPhotos.length === 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-4 rounded-xl bg-slate-950/50 border border-dashed border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 py-3 px-3 sm:px-4 rounded-xl bg-slate-950/50 border border-dashed border-slate-800">
                       <p className="text-xs text-slate-500 italic">
                         Belum ada dokumentasi foto untuk ruas jalan ini.
                       </p>
                       <button
                         type="button"
                         onClick={() => setImportTargetRuas(ruas)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-xs font-semibold transition cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-xs font-semibold whitespace-nowrap transition cursor-pointer"
                       >
-                        <ImagePlus className="w-3.5 h-3.5 text-sky-400" />
+                        <ImagePlus className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                         <span>Impor Foto Sekarang</span>
                       </button>
                     </div>
                   ) : (
-                    <div dir="ltr" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div dir="ltr" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                       {rPhotos.map((photo) => {
                         const pColors = getConditionColor(photo.pkrmsCondition);
 
@@ -536,22 +536,22 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
 
       {/* Modal Konfirmasi Hapus Foto */}
       {confirmDeletePhotoId && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-2xl">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-100 text-center mb-2">
+            <h3 className="text-base sm:text-lg font-bold text-slate-100 text-center mb-2">
               Hapus Foto Dokumentasi?
             </h3>
-            <p className="text-sm text-slate-400 text-center mb-6">
+            <p className="text-xs sm:text-sm text-slate-400 text-center mb-5 sm:mb-6">
               Foto dokumentasi survei kondisi jalan ini akan dihapus dari penyimpanan lokal dan pelaporan ruas. Tindakan ini tidak dapat dibatalkan.
             </p>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmDeletePhotoId(null)}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition cursor-pointer"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition cursor-pointer"
               >
                 Batal
               </button>
@@ -561,7 +561,7 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
                   onDeletePhoto(confirmDeletePhotoId);
                   setConfirmDeletePhotoId(null);
                 }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold transition shadow-lg shadow-rose-600/30 cursor-pointer"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-bold transition shadow-lg shadow-rose-600/30 cursor-pointer"
               >
                 Ya, Hapus Foto
               </button>
@@ -572,8 +572,8 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
 
       {/* Modal Konfirmasi Hapus Semua Titik Foto */}
       {confirmDeleteAllPhotos && onDeleteAllPhotos && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-2xl">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-6 h-6" />
             </div>

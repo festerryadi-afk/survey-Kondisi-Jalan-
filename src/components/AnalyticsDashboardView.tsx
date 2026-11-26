@@ -75,18 +75,18 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
   });
 
   return (
-    <div className="flex-1 bg-slate-950 text-slate-100 p-4 sm:p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="flex-1 bg-slate-950 text-slate-100 p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-3 sm:pb-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-amber-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <BarChart3 className="w-5 h-5 text-amber-400 shrink-0" />
+              <h2 className="text-base sm:text-xl font-bold text-white tracking-tight">
                 Dasbor Analisis Kondisi Jalan
               </h2>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-[11px] sm:text-sm text-slate-400 mt-1">
               Rekapitulasi teknis kemantapan jalan, distribusi kerusakan, dan rekomendasi program penanganan DPUPR Kab. Kepulauan Mentawai.
             </p>
           </div>
@@ -96,78 +96,78 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
               const xml = generateExcelXML(ruasList, photos);
               downloadFile(xml, `Rekap_Analisis_Kondisi_Jalan_Mentawai_${Date.now()}.xls`, 'application/vnd.ms-excel');
             }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-xs transition"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto px-3.5 py-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-xs whitespace-nowrap transition cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Ekspor Rekap Excel</span>
           </button>
         </div>
 
         {/* Top Summary Cards: Kemantapan Jalan Standar Bina Marga & PKRMS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="col-span-2 sm:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs">
               <span>Total Jaringan Ruas</span>
-              <Layers className="w-4 h-4 text-amber-400" />
+              <Layers className="w-4 h-4 text-amber-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-white">
-              {totalLengthKm.toFixed(1)} <span className="text-sm font-semibold text-slate-400">km</span>
+            <div className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-black text-white tabular-nums">
+              {totalLengthKm.toFixed(1)} <span className="text-xs sm:text-sm font-semibold text-slate-400">km</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">
               {ruasList.length} Ruas Prioritas Mentawai
             </p>
           </div>
 
-          <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-4 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Tingkat Kemantapan Jalan</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-3 sm:p-4 shadow">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs gap-1">
+              <span className="truncate">Kemantapan Jalan</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-emerald-400">
+            <div className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-black text-emerald-400 tabular-nums">
               {percentMantap.toFixed(1)}%
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              {kmMantap.toFixed(1)} km Mantap (Baik + Sedang)
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1">
+              {kmMantap.toFixed(1)} km Mantap
             </p>
           </div>
 
-          <div className="bg-slate-900 border border-rose-500/30 rounded-xl p-4 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Kondisi Belum Mantap</span>
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+          <div className="bg-slate-900 border border-rose-500/30 rounded-xl p-3 sm:p-4 shadow">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs gap-1">
+              <span className="truncate">Belum Mantap</span>
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             </div>
-            <div className="mt-2 text-2xl font-black text-rose-400">
-              {kmTidakMantap.toFixed(1)} <span className="text-sm font-semibold text-slate-400">km</span>
+            <div className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-black text-rose-400 tabular-nums">
+              {kmTidakMantap.toFixed(1)} <span className="text-xs sm:text-sm font-semibold text-slate-400">km</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Rusak Ringan &amp; Rusak Berat
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1">
+              Rusak Ringan &amp; Berat
             </p>
           </div>
         </div>
 
         {/* PKRMS 2026 Condition Progress Bars */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-              <span>Klasifikasi Kondisi Jalan PKRMS 2026 (Kementerian PUPR)</span>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl space-y-3 sm:space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-800 pb-2.5 sm:pb-3">
+            <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Klasifikasi Kondisi Jalan PKRMS 2026</span>
             </h3>
-            <span className="text-xs text-slate-400">Standar Bina Marga RI</span>
+            <span className="text-[10px] sm:text-xs text-slate-400">Standar Bina Marga RI</span>
           </div>
 
           <div className="space-y-3">
             {/* Baik */}
             <div>
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs mb-1">
                 <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  Kondisi Baik (IRI &lt; 4.0 m/km, SDI &lt; 50)
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                  <span>Baik (IRI &lt; 4,0 • SDI &lt; 50)</span>
                 </span>
-                <span className="font-mono text-slate-300 font-bold">
+                <span className="font-mono text-slate-300 font-bold tabular-nums">
                   {conditionKm.Baik.toFixed(1)} km ({((conditionKm.Baik / denomKm) * 100 || 0).toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-800 h-2.5 sm:h-3 rounded-full overflow-hidden">
                 <div 
                   className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${(conditionKm.Baik / denomKm) * 100}%` }}
@@ -177,16 +177,16 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
 
             {/* Sedang */}
             <div>
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs mb-1">
                 <span className="font-semibold text-amber-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                  Kondisi Sedang (IRI 4.0 - 8.0 m/km, SDI 50 - 100)
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shrink-0" />
+                  <span>Sedang (IRI 4–8 • SDI 50–100)</span>
                 </span>
-                <span className="font-mono text-slate-300 font-bold">
+                <span className="font-mono text-slate-300 font-bold tabular-nums">
                   {conditionKm.Sedang.toFixed(1)} km ({((conditionKm.Sedang / denomKm) * 100 || 0).toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-800 h-2.5 sm:h-3 rounded-full overflow-hidden">
                 <div 
                   className="bg-amber-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${(conditionKm.Sedang / denomKm) * 100}%` }}
@@ -196,16 +196,16 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
 
             {/* Rusak Ringan */}
             <div>
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs mb-1">
                 <span className="font-semibold text-orange-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                  Rusak Ringan (IRI 8.0 - 12.0 m/km, SDI 100 - 150)
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block shrink-0" />
+                  <span>Rusak Ringan (IRI 8–12 • SDI 100–150)</span>
                 </span>
-                <span className="font-mono text-slate-300 font-bold">
+                <span className="font-mono text-slate-300 font-bold tabular-nums">
                   {conditionKm['Rusak Ringan'].toFixed(1)} km ({((conditionKm['Rusak Ringan'] / denomKm) * 100 || 0).toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-800 h-2.5 sm:h-3 rounded-full overflow-hidden">
                 <div 
                   className="bg-orange-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${(conditionKm['Rusak Ringan'] / denomKm) * 100}%` }}
@@ -215,16 +215,16 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
 
             {/* Rusak Berat */}
             <div>
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs mb-1">
                 <span className="font-semibold text-rose-400 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                  Rusak Berat (IRI &gt; 12.0 m/km, SDI &gt; 150)
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shrink-0" />
+                  <span>Rusak Berat (IRI &gt; 12 • SDI &gt; 150)</span>
                 </span>
-                <span className="font-mono text-slate-300 font-bold">
+                <span className="font-mono text-slate-300 font-bold tabular-nums">
                   {conditionKm['Rusak Berat'].toFixed(1)} km ({((conditionKm['Rusak Berat'] / denomKm) * 100 || 0).toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-800 h-2.5 sm:h-3 rounded-full overflow-hidden">
                 <div 
                   className="bg-rose-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${(conditionKm['Rusak Berat'] / denomKm) * 100}%` }}
@@ -235,20 +235,20 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
         </div>
 
         {/* 2-Column Section: Surface Types & Treatment Program Budget */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Surface Types Breakdown */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-              <PieIcon className="w-4 h-4 text-amber-400" />
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl space-y-3 sm:space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2.5 sm:pb-3">
+              <PieIcon className="w-4 h-4 text-amber-400 shrink-0" />
               <span>Distribusi Jenis Perkerasan Jalan (per STA)</span>
             </h3>
 
             <div className="space-y-3">
               {Object.entries(surfaceStats).map(([type, km]) => (
                 <div key={type}>
-                  <div className="flex items-center justify-between text-xs mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs mb-1">
                     <span className="text-slate-300 font-medium">{type}</span>
-                    <span className="font-mono text-amber-300 font-bold">
+                    <span className="font-mono text-amber-300 font-bold tabular-nums">
                       {km.toFixed(1)} km ({((km / denomKm) * 100 || 0).toFixed(1)}%)
                     </span>
                   </div>
@@ -264,13 +264,13 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
           </div>
 
           {/* PKRMS Treatment Program Allocation */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Wrench className="w-4 h-4 text-sky-400" />
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl space-y-3 sm:space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2.5 sm:pb-3">
+              <Wrench className="w-4 h-4 text-sky-400 shrink-0" />
               <span>Rencana Program Penanganan PKRMS 2026</span>
             </h3>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2.5 sm:space-y-3 text-xs">
               <div className="flex items-center justify-between p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
                 <div>
                   <div className="font-bold text-white">Pemeliharaan Rutin</div>
@@ -335,13 +335,13 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
         </div>
 
         {/* AI Road Defect Detection Breakdown */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3 mb-4">
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
-            <span>Inventarisasi Cacat Jalan Terdeteksi AI (Interval 100m)</span>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl">
+          <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2.5 sm:pb-3 mb-3 sm:mb-4">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>Inventarisasi Cacat Jalan Terdeteksi AI (100m)</span>
           </h3>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 text-center">
             <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
               <div className="text-xs text-slate-400">Lubang (Pothole)</div>
               <div className="text-2xl font-black text-rose-400 mt-1">{potholeCount}</div>

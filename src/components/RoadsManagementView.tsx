@@ -170,50 +170,49 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
   };
 
   return (
-    <div className="flex-1 bg-slate-950 text-slate-100 p-4 sm:p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="flex-1 bg-slate-950 text-slate-100 p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden">
+      <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Title Bar & Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-800 pb-3 sm:pb-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-amber-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+              <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">
                 Kelola Ruas Jalan &amp; Lampiran Lapangan
               </h2>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-[11px] sm:text-sm text-slate-400 mt-1">
               Basis data ruas jalan Kabupaten Kepulauan Mentawai dengan tipe permukaan jalan dan kondisi jalan per STA pada setiap ruas.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={downloadRuasExcelTemplate}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-xs sm:text-sm shadow-md transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 font-semibold text-[11px] sm:text-xs shadow-md transition whitespace-nowrap cursor-pointer"
               title="Unduh file template Excel (*.xlsx) untuk pengisian ruas jalan baru"
             >
-              <Download className="w-4 h-4 text-emerald-400" />
+              <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Template Excel</span>
             </button>
 
             <button
               type="button"
               onClick={() => setIsExcelImportModalOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-200 font-semibold text-xs sm:text-sm shadow-md transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-200 font-semibold text-[11px] sm:text-xs shadow-md transition whitespace-nowrap cursor-pointer"
               title="Impor daftar ruas jalan baru dari file Excel (*.xlsx / *.xls)"
             >
-              <FileSpreadsheet className="w-4 h-4 text-sky-400" />
-              <Upload className="w-3.5 h-3.5 text-sky-300" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               <span>Impor Ruas (Excel)</span>
             </button>
 
             <button
               type="button"
               onClick={handleOpenAdd}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md transition cursor-pointer"
+              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition whitespace-nowrap cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 shrink-0" />
               <span>Tambah Ruas Baru</span>
             </button>
 
@@ -221,10 +220,10 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
               type="button"
               disabled={ruasList.length === 0}
               onClick={() => exportGpsTracksToExcel(ruasList)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 disabled:opacity-40 disabled:cursor-not-allowed border border-cyan-500/50 text-cyan-200 font-semibold text-xs sm:text-sm shadow-md transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-cyan-950 hover:bg-cyan-900 disabled:opacity-40 disabled:cursor-not-allowed border border-cyan-500/50 text-cyan-200 font-semibold text-[11px] sm:text-xs shadow-md transition whitespace-nowrap cursor-pointer"
               title="Ekspor hasil GPS Tracker (per 100m + STA Akhir) seluruh ruas ke file Excel (.xlsx)"
             >
-              <Route className="w-4 h-4 text-cyan-400" />
+              <Route className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span>Tracker Excel</span>
             </button>
 
@@ -232,10 +231,10 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
               type="button"
               disabled={ruasList.length === 0}
               onClick={() => void exportGpsTracksToKMZ(ruasList)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-indigo-950 hover:bg-indigo-900 disabled:opacity-40 disabled:cursor-not-allowed border border-indigo-500/50 text-indigo-200 font-semibold text-xs sm:text-sm shadow-md transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-indigo-950 hover:bg-indigo-900 disabled:opacity-40 disabled:cursor-not-allowed border border-indigo-500/50 text-indigo-200 font-semibold text-[11px] sm:text-xs shadow-md transition whitespace-nowrap cursor-pointer"
               title="Ekspor hasil GPS Tracker seluruh ruas ke file KMZ (Google Earth)"
             >
-              <FileCode className="w-4 h-4 text-indigo-400" />
+              <FileCode className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
               <span>Tracker KMZ</span>
             </button>
 
@@ -243,31 +242,31 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
               type="button"
               disabled={ruasList.length === 0}
               onClick={() => setIsDeleteAllModalOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-rose-950 hover:bg-rose-900 disabled:opacity-40 disabled:cursor-not-allowed border border-rose-500/50 text-rose-200 font-semibold text-xs sm:text-sm shadow-md transition cursor-pointer"
+              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-rose-950 hover:bg-rose-900 disabled:opacity-40 disabled:cursor-not-allowed border border-rose-500/50 text-rose-200 font-semibold text-[11px] sm:text-xs shadow-md transition whitespace-nowrap cursor-pointer"
               title="Hapus seluruh data ruas jalan"
             >
-              <Trash2 className="w-4 h-4 text-rose-400" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
               <span>Hapus Seluruh Ruas</span>
             </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 p-3 rounded-xl border border-slate-800">
-          <div className="flex items-center gap-2 flex-1 min-w-[260px] bg-slate-950/80 px-3 py-2 rounded-lg border border-slate-700">
+        <div className="flex items-center gap-2 bg-slate-900 p-2 sm:p-3 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-2 flex-1 min-w-0 bg-slate-950/80 px-2.5 py-2 rounded-lg border border-slate-700">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Cari nomor, nama ruas jalan, atau wilayah/pulau..."
+              placeholder="Cari nomor, nama ruas, atau wilayah..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Ruas Jalan Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredRuas.map((ruas) => {
             const segments = getRuasSTASegments(ruas);
             const ruasPhotoCount = photos.filter((p) => p.ruasId === ruas.id).length;
@@ -276,25 +275,25 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
             return (
               <div
                 key={ruas.id}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between shadow-lg transition"
+                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3 sm:p-4 flex flex-col justify-between shadow-lg transition min-w-0"
               >
                 <div>
                   {/* Card Header */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-xs font-mono font-bold bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded border border-amber-500/30">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] sm:text-xs font-mono font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-amber-500/30 whitespace-nowrap shrink-0">
                       Ruas {ruas.nomorRuas}
                     </span>
-                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-slate-800 text-slate-200 border-slate-700">
+                    <span className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border bg-slate-800 text-slate-200 border-slate-700 whitespace-nowrap shrink-0">
                       {segments.length} Segmen STA
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-white leading-snug">
+                  <h3 className="text-sm sm:text-base font-bold text-white leading-snug">
                     {ruas.namaRuas}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-1 flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                    <span>{ruas.kecamatanPulau}</span>
+                    <span className="truncate">{ruas.kecamatanPulau}</span>
                   </p>
 
                   {/* Road Dimensions */}
@@ -388,12 +387,12 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                 </div>
 
                 {/* Card Action Buttons: Fitur Impor Foto, Impor Video, Atur STA, Edit & Delete */}
-                <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-800 space-y-2">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setImportPhotoRuas(ruas)}
-                      className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-xs font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-500/40 text-sky-200 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition cursor-pointer"
                       title="Impor foto dokumentasi ke ruas jalan ini"
                     >
                       <ImagePlus className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -403,7 +402,7 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setImportVideoRuas(ruas)}
-                      className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-xs font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition cursor-pointer"
                       title="Impor video survei ke ruas jalan ini"
                     >
                       <VideoIcon className="w-3.5 h-3.5 text-rose-400 shrink-0" />
@@ -415,7 +414,7 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                     <button
                       type="button"
                       onClick={() => exportGpsTracksToExcel(ruasList, ruas)}
-                      className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 text-[11px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-1.5 px-1.5 sm:px-2 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap transition cursor-pointer"
                       title={`Ekspor hasil GPS Tracker Ruas ${ruas.nomorRuas} ke Excel (.xlsx)`}
                     >
                       <FileSpreadsheet className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -424,7 +423,7 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                     <button
                       type="button"
                       onClick={() => exportGpsTracksToKML(ruasList, ruas)}
-                      className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 text-[11px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-1.5 px-1.5 sm:px-2 rounded-lg bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap transition cursor-pointer"
                       title={`Ekspor hasil GPS Tracker Ruas ${ruas.nomorRuas} ke KML`}
                     >
                       <FileCode className="w-3 h-3 text-cyan-400 shrink-0" />
@@ -433,7 +432,7 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                     <button
                       type="button"
                       onClick={() => void exportGpsTracksToKMZ(ruasList, ruas)}
-                      className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-indigo-950/90 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 text-[11px] font-semibold transition cursor-pointer"
+                      className="flex items-center justify-center gap-1 py-1.5 px-1.5 sm:px-2 rounded-lg bg-indigo-950/90 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap transition cursor-pointer"
                       title={`Ekspor hasil GPS Tracker Ruas ${ruas.nomorRuas} ke KMZ`}
                     >
                       <Route className="w-3 h-3 text-indigo-400 shrink-0" />
@@ -441,31 +440,31 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => setStaModalRuas(ruas)}
-                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] sm:text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-1.5 transition cursor-pointer"
                       title="Kelola Tipe Permukaan dan Kondisi Jalan per STA"
                     >
-                      <ListChecks className="w-3.5 h-3.5" />
+                      <ListChecks className="w-3.5 h-3.5 shrink-0" />
                       <span>STA</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(ruas)}
-                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] sm:text-xs font-medium whitespace-nowrap flex items-center justify-center gap-1.5 transition cursor-pointer"
                       title="Edit Data Ruas Jalan"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                      <Edit3 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
                       <span>Edit</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleOpenDelete(ruas.id)}
-                      className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-rose-400 border border-slate-700 text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer"
+                      className="py-1.5 px-2.5 sm:px-3 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-rose-400 border border-slate-700 text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer shrink-0"
                       title="Hapus Ruas Jalan"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -516,10 +515,10 @@ export const RoadsManagementView: React.FC<RoadsManagementViewProps> = ({
 
       {/* MODAL: Tambah / Edit Ruas Jalan (tanpa tipe permukaan, kondisi, SDI, IRI, rekomendasi penanganan) */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-2.5 sm:p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-base sm:text-lg font-bold text-white">
                 {editingRuas ? 'Edit Data Ruas Jalan' : 'Tambah Ruas Jalan Baru'}
               </h3>
               <button

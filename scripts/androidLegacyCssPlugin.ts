@@ -235,8 +235,13 @@ function replaceColorMix(css: string, colorVars: Map<string, [number, number, nu
       }
     }
 
-    result += converted ?? css.slice(idx, end + 1);
-    i = end + 1;
+    if (!converted) {
+      result += target;
+      i = idx + target.length;
+    } else {
+      result += converted;
+      i = end + 1;
+    }
   }
   return result;
 }
@@ -251,24 +256,51 @@ function convertSpaceRgbSyntax(css: string): string {
   );
 }
 
+function splitCssValues(val: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (let i = 0; i < val.length; i++) {
+    const ch = val[i];
+    if (ch === '(') {
+      depth++;
+      current += ch;
+    } else if (ch === ')') {
+      depth = Math.max(0, depth - 1);
+      current += ch;
+    } else if (/\s/.test(ch) && depth === 0) {
+      if (current.length > 0) {
+        parts.push(current);
+        current = '';
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts;
+}
+
 function expandLogicalProperties(css: string): string {
   let out = css;
 
   // Helper: only match actual property declarations preceded by start, ';', '{', or whitespace after ';'/'{'
   out = out.replace(/(^|[;{])\s*inset-inline\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const l = parts[0];
     const r = parts[1] ?? l;
     return `${sep}left:${l};right:${r}`;
   });
   out = out.replace(/(^|[;{])\s*inset-block\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const t = parts[0];
     const b = parts[1] ?? t;
     return `${sep}top:${t};bottom:${b}`;
   });
   out = out.replace(/(^|[;{])\s*inset\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const t = parts[0];
     const r = parts[1] ?? t;
     const b = parts[2] ?? t;
@@ -286,7 +318,7 @@ function expandLogicalProperties(css: string): string {
     '$1padding-right:$2'
   );
   out = out.replace(/(^|[;{])\s*padding-inline\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const l = parts[0];
     const r = parts[1] ?? l;
     return `${sep}padding-left:${l};padding-right:${r}`;
@@ -300,7 +332,7 @@ function expandLogicalProperties(css: string): string {
     '$1padding-bottom:$2'
   );
   out = out.replace(/(^|[;{])\s*padding-block\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const t = parts[0];
     const b = parts[1] ?? t;
     return `${sep}padding-top:${t};padding-bottom:${b}`;
@@ -316,7 +348,7 @@ function expandLogicalProperties(css: string): string {
     '$1margin-right:$2'
   );
   out = out.replace(/(^|[;{])\s*margin-inline\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const l = parts[0];
     const r = parts[1] ?? l;
     return `${sep}margin-left:${l};margin-right:${r}`;
@@ -330,7 +362,7 @@ function expandLogicalProperties(css: string): string {
     '$1margin-bottom:$2'
   );
   out = out.replace(/(^|[;{])\s*margin-block\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     const t = parts[0];
     const b = parts[1] ?? t;
     return `${sep}margin-top:${t};margin-bottom:${b}`;
@@ -356,7 +388,7 @@ function expandLogicalProperties(css: string): string {
     '$1transform:translate(var(--tw-translate-x),var(--tw-translate-y))'
   );
   out = out.replace(/(^|[;{])\s*translate\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     if (parts.length === 1) return `${sep}transform:translateX(${parts[0]})`;
     return `${sep}transform:translate(${parts[0]},${parts[1]})`;
   });
@@ -365,7 +397,7 @@ function expandLogicalProperties(css: string): string {
     '$1transform:scale(var(--tw-scale-x),var(--tw-scale-y))'
   );
   out = out.replace(/(^|[;{])\s*scale\s*:\s*([^;{}]+)/gi, (_m, sep, val) => {
-    const parts = val.trim().split(/\s+/);
+    const parts = splitCssValues(val.trim());
     if (parts.length === 1) return `${sep}transform:scale(${parts[0]})`;
     return `${sep}transform:scale(${parts[0]},${parts[1]})`;
   });

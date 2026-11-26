@@ -207,12 +207,12 @@ export async function getStoredVideoEntry(videoId: string): Promise<StoredVideoE
 
 export function getBestSupportedVideoMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
-  // Prioritaskan MP4 H.264 native (MediaCodec hardware) lalu WebM VP8 (paling stabil & mulus
-  // di WebView Android Snapdragon/MediaTek dibanding H.264-in-WebM yang sering memakai OpenH264 CPU).
+  // Prioritaskan WebM VP8 (hardware MediaCodec paling stabil & mulus untuk canvas.captureStream
+  // realtime di Android WebView & desktop), baru MP4 H.264 (untuk iOS/Safari), lalu VP9/H264 fallback.
   const candidates = [
+    'video/webm;codecs=vp8',
     'video/mp4;codecs=avc1.42E01E',
     'video/mp4',
-    'video/webm;codecs=vp8',
     'video/webm;codecs=vp9',
     'video/webm;codecs=h264',
     'video/webm',
@@ -349,8 +349,8 @@ class WatermarkStripCache {
       lng: number;
     }
   ) {
-    const stripHeight = Math.max(120, Math.round(h * 0.22));
-    const key = `${w}x${h}|${metadata.nomorRuas}|${metadata.namaRuas}|${metadata.staText}|${metadata.lat.toFixed(6)}|${metadata.lng.toFixed(6)}`;
+    const stripHeight = Math.max(84, Math.round(h * 0.24));
+    const key = `${w}x${h}|${metadata.nomorRuas}|${metadata.namaRuas}|${metadata.staText}|${metadata.lat.toFixed(5)}|${metadata.lng.toFixed(5)}`;
 
     if (!this.stripCanvas || this.stripCanvas.width !== w || this.stripHeight !== stripHeight) {
       this.stripCanvas = document.createElement('canvas');
@@ -365,13 +365,16 @@ class WatermarkStripCache {
       this.stripCtx.clearRect(0, 0, w, stripHeight);
       this.stripCtx.save();
       this.stripCtx.translate(0, -(h - stripHeight));
-      drawWatermark(this.stripCtx, w, h, metadata);
+      drawWatermark(this.stripCtx, w, h, metadata, { fastNoBlur: true });
       this.stripCtx.restore();
       this.lastKey = key;
     }
 
     if (this.stripCanvas) {
+      const prevSmooth = targetCtx.imageSmoothingEnabled;
+      targetCtx.imageSmoothingEnabled = false;
       targetCtx.drawImage(this.stripCanvas, 0, h - stripHeight);
+      targetCtx.imageSmoothingEnabled = prevSmooth;
     }
   }
 
@@ -482,6 +485,8 @@ export class RoadSurveyRecorder {
     requestVideoFrameCallback?: (cb: (now: number) => void) => number;
     cancelVideoFrameCallback?: (id: number) => void;
   }) | null = null;
+  private captureTrack: (MediaStreamTrack & { requestFrame?: () => void }) | null = null;
+  private supportsManualRequestFrame = false;
   private backgroundTimerId: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private paused = false;
@@ -514,8 +519,8 @@ export class RoadSurveyRecorder {
     this.canvas = document.createElement('canvas');
     this.canvas.width = w;
     this.canvas.height = h;
+    // JANGAN pakai desynchronized:true di kanvas offscreen captureStream karena memotong barrier sinkronisasi encoder WebView
     this.ctx =
-      this.canvas.getContext('2d', { alpha: false, desynchronized: true }) ||
       this.canvas.getContext('2d', { alpha: false }) ||
       this.canvas.getContext('2d');
     this.getSnapshot = options.getSnapshot;
@@ -571,8 +576,8 @@ export class RoadSurveyRecorder {
       }
     }
     try {
-      const w = this.canvas.width || 854;
-      const h = this.canvas.height || 480;
+      const w = this.canvas.width || 640;
+      const h = this.canvas.height || 360;
       if (!this.cleanSnapCanvas || this.cleanSnapCanvas.width !== w || this.cleanSnapCanvas.height !== h) {
         this.cleanSnapCanvas = document.createElement('canvas');
         this.cleanSnapCanvas.width = w;
@@ -594,7 +599,7 @@ export class RoadSurveyRecorder {
     const h = this.canvas.height;
     const dtSec =
       this.lastAnimMs > 0
-        ? Math.min(0.1, Math.max(0.001, (nowMs - this.lastAnimMs) / 1000))
+        ? Math.min(0.25, Math.max(0.001, (nowMs - this.lastAnimMs) / 1000))
         : 1 / this.targetFps;
     this.lastAnimMs = nowMs;
     this.lastDrawMs = nowMs;
@@ -608,13 +613,13 @@ export class RoadSurveyRecorder {
     } else {
       const stepSpeed = snap.speedKmh > 0 ? Math.max(3, snap.speedKmh) : 0;
       if (stepSpeed > 0) {
-        // Skala kecepatan halus berbasis delta-time (phase/detik)
+        // Skala kecepatan halus berbasis delta-time (phase/detik) agar sinkron realtime 1:1
         this.phase = (this.phase + (stepSpeed / 40) * 0.65 * dtSec) % 1;
       }
       drawRoadSimulationVideoFrame(this.ctx, w, h, this.phase, snap.defects);
     }
 
-    // Watermark di kiri bawah tanpa frame (di-cache agar tidak memicu shadowBlur per frame)
+    // Watermark di kiri bawah tanpa frame (di-cache & fastNoBlur agar tidak ada beban CPU per frame)
     this.watermarkCache.draw(this.ctx, w, h, {
       nomorRuas: snap.nomorRuas,
       namaRuas: snap.namaRuas,
@@ -623,8 +628,17 @@ export class RoadSurveyRecorder {
       lng: snap.lng,
     });
 
+    // Dorong frame tepat setelah kanvas selesai digambar (1 frame draw = 1 frame MediaRecorder realtime)
+    if (this.supportsManualRequestFrame && this.captureTrack?.requestFrame) {
+      try {
+        this.captureTrack.requestFrame();
+      } catch {
+        // ignore if track stopped
+      }
+    }
+
     // Tunda pembuatan thumbnail JPEG beberapa frame setelah start agar header muxer mulus
-    if (!this.thumbnailUrl && this.renderedFrameCount >= 12) {
+    if (!this.thumbnailUrl && this.renderedFrameCount >= 18) {
       this.thumbnailUrl = createCompactVideoThumbnail(this.canvas);
     }
   }
@@ -709,12 +723,29 @@ export class RoadSurveyRecorder {
       mozCaptureStream?: (fps?: number) => MediaStream;
     };
 
-    // Gunakan fixed-FPS captureStream(targetFps) agar muxer MediaRecorder Android menerima
-    // timestamp CFR yang stabil dan tidak tersendat-sendat.
     let stream: MediaStream | null = null;
+    this.captureTrack = null;
+    this.supportsManualRequestFrame = false;
     try {
       if (canvasAny.captureStream) {
-        stream = canvasAny.captureStream(this.targetFps);
+        // Mode push frame manual (0) + requestFrame() memastikan 1 frame gambar = 1 frame video realtime
+        // tanpa polling ganda atau frame duplikat/tersendat di Android WebView
+        const testStream = canvasAny.captureStream(0);
+        const track = testStream.getVideoTracks()[0] as
+          | (MediaStreamTrack & { requestFrame?: () => void })
+          | undefined;
+        if (track && typeof track.requestFrame === 'function') {
+          stream = testStream;
+          this.captureTrack = track;
+          this.supportsManualRequestFrame = true;
+        } else {
+          try {
+            testStream.getTracks().forEach((t) => t.stop());
+          } catch {
+            // ignore
+          }
+          stream = canvasAny.captureStream(this.targetFps);
+        }
       } else if (canvasAny.mozCaptureStream) {
         stream = canvasAny.mozCaptureStream(this.targetFps);
       }
@@ -727,8 +758,6 @@ export class RoadSurveyRecorder {
       this.stopLoops();
       return false;
     }
-
-    this.renderOneFrame(performance.now());
 
     const bestMime = getBestSupportedVideoMimeType();
     this.mimeType = bestMime || 'video/webm';
@@ -749,6 +778,8 @@ export class RoadSurveyRecorder {
       } catch {
         this.running = false;
         this.stopLoops();
+        this.captureTrack = null;
+        this.supportsManualRequestFrame = false;
         try {
           stream.getTracks().forEach((t) => t.stop());
         } catch {
@@ -775,6 +806,8 @@ export class RoadSurveyRecorder {
       this.running = false;
       this.mediaRecorder = null;
       this.stopLoops();
+      this.captureTrack = null;
+      this.supportsManualRequestFrame = false;
       try {
         stream.getTracks().forEach((t) => t.stop());
       } catch {
@@ -783,17 +816,19 @@ export class RoadSurveyRecorder {
       return false;
     }
 
+    // Gambar & dorong frame pertama SETELAH MediaRecorder.start() agar timestamp frame 0 sinkron
+    this.renderOneFrame(performance.now());
     this.scheduleNextRender();
 
-    // Penjaga hanya saat tab/layar di latar belakang agar rAF tidak bentrok di foreground
+    // Penjaga stall (baik saat background maupun bila callback kamera sempat tertahan >250ms)
     this.backgroundTimerId = setInterval(() => {
       if (!this.running || this.paused) return;
-      if (typeof document !== 'undefined' && !document.hidden) return;
       const now = performance.now();
-      if (now - this.lastDrawMs >= 200) {
+      const stallThresholdMs = typeof document !== 'undefined' && document.hidden ? 150 : 280;
+      if (now - this.lastDrawMs >= stallThresholdMs) {
         this.renderOneFrame(now);
       }
-    }, 250);
+    }, 200);
 
     return true;
   }
@@ -808,6 +843,8 @@ export class RoadSurveyRecorder {
     this.running = false;
     this.paused = false;
     this.stopLoops();
+    this.captureTrack = null;
+    this.supportsManualRequestFrame = false;
 
     const recorder = this.mediaRecorder;
     this.mediaRecorder = null;
