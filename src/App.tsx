@@ -113,7 +113,9 @@ export default function App() {
   const [selectedRuasId, setSelectedRuasId] = useState<string>(ruasList[0]?.id || 'ruas-01');
 
   // System status
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
   const [batterySaver, setBatterySaver] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSurveyFullscreen, setIsSurveyFullscreen] = useState<boolean>(false);
@@ -723,7 +725,7 @@ export default function App() {
   const isFullscreenSurveyActive = activeTab === 'camera' && isSurveyFullscreen;
 
   return (
-    <div className={`min-h-screen bg-slate-950 flex flex-col font-sans select-none ${batterySaver ? 'brightness-90 contrast-95' : ''}`}>
+    <div className={`min-h-screen bg-slate-950 flex flex-col font-sans select-none overflow-x-hidden ${batterySaver ? 'brightness-90 contrast-95' : ''}`}>
       {/* App Header (disembunyikan saat survei berjalan agar layar hanya menampilkan kamera realtime) */}
       {!isFullscreenSurveyActive && (
         <Header
@@ -906,7 +908,7 @@ export default function App() {
 
       {/* Floating Field Alert Toast (tidak muncul menutupi kamera saat survei aktif) */}
       {toastMessage && !isFullscreenSurveyActive && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 shadow-2xl rounded-xl px-4 py-3 flex items-center gap-3 text-xs text-white animate-in fade-in slide-in-from-bottom duration-200 max-w-md">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 shadow-2xl rounded-xl px-3.5 py-2.5 flex items-center gap-3 text-xs text-white animate-in fade-in slide-in-from-bottom duration-200 w-[calc(100vw-2rem)] sm:w-auto max-w-md">
           <div className={`w-3 h-3 rounded-full shrink-0 ${
             toastMessage.type === 'alert' ? 'bg-rose-500 animate-ping' : toastMessage.type === 'sync' ? 'bg-emerald-500' : 'bg-sky-500'
           }`} />

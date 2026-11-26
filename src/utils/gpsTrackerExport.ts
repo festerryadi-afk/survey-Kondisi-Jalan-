@@ -8,6 +8,7 @@ import {
   formatSTA,
   interpolateCoordAlongRuas,
 } from './geo';
+import { triggerBlobDownload } from './nativeDownload';
 
 function escapeXml(value: unknown): string {
   return String(value ?? '')
@@ -25,16 +26,6 @@ function sanitizeFileSegment(text: string): string {
     .slice(0, 48);
 }
 
-function triggerBlobDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 export interface EffectiveRuasGpsTrack {
   ruas: RuasJalan;
@@ -283,7 +274,11 @@ export function exportGpsTracksToExcel(
     ? `Tracker_GPS_Ruas_${sanitizeFileSegment(singleRuas.nomorRuas)}_${sanitizeFileSegment(singleRuas.namaRuas)}_${dateTag}.xlsx`
     : `Tracker_GPS_Jalan_Mentawai_${dateTag}.xlsx`;
 
-  XLSX.writeFile(wb, fileName);
+  const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const excelBlob = new Blob([wbOut], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  triggerBlobDownload(excelBlob, fileName);
 
   return {
     exportedCount: tracks.length,

@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { getStoredVideoEntry, saveVideoBlobToStorage } from './videoRecorder';
 import { DEFAULT_CONDITION_COLORS } from '../components/MapLayerColorModal';
+import { triggerBlobDownload } from './nativeDownload';
 
 export interface SerializedVideoBlob {
   videoId: string;
@@ -143,17 +144,7 @@ export function downloadPublishPackageJson(snapshot: PublishAppSnapshot): string
   const filename = `Paket_Publish_SurveyJalan_Mentawai_${dateStr}.json`;
   const json = JSON.stringify(snapshot, null, 2);
   const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    if (a.parentNode) a.parentNode.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 200);
+  triggerBlobDownload(blob, filename);
   return filename;
 }
 

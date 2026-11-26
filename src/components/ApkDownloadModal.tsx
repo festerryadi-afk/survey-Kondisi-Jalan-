@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { triggerBlobDownload } from '../utils/nativeDownload';
 
 interface ApkDownloadModalProps {
   isOpen: boolean;
@@ -121,27 +122,12 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({
     `.trim();
 
     setTimeout(() => {
-      // Trigger download of the APK installer launcher
       const blob = new Blob([apkBootstrapContent], { type: 'text/html;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Survey_Kondisi_Jalan_Kab_Mentawai.apk.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, 'Survey_Kondisi_Jalan_Kab_Mentawai.apk.html');
 
       // Also generate Android Package descriptor manifest file
       const manifestBlob = new Blob([JSON.stringify(manifestJson, null, 2)], { type: 'application/json' });
-      const manifestUrl = URL.createObjectURL(manifestBlob);
-      const manifestA = document.createElement('a');
-      manifestA.href = manifestUrl;
-      manifestA.download = `manifest.webmanifest`;
-      document.body.appendChild(manifestA);
-      manifestA.click();
-      document.body.removeChild(manifestA);
-      URL.revokeObjectURL(manifestUrl);
+      triggerBlobDownload(manifestBlob, 'manifest.webmanifest');
 
       setIsDownloadingApk(false);
       setDownloadSuccess(true);
@@ -262,14 +248,7 @@ Fitur:
 5. Ekspor data jalur ke KML (Google Earth/QGIS), CSV, PDF, dan Excel.
                 `.trim();
                 const blob = new Blob([offlineInstructions], { type: 'text/plain;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `PANDUAN_APK_SURVEI_MENTAWAI_2026.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                triggerBlobDownload(blob, 'PANDUAN_APK_SURVEI_MENTAWAI_2026.txt');
               }}
               className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-900 transition text-left group"
             >

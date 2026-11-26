@@ -207,14 +207,15 @@ export async function getStoredVideoEntry(videoId: string): Promise<StoredVideoE
 
 export function getBestSupportedVideoMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
-  // Prioritaskan WebM VP8/VP9 di Chromium/Android agar encoding real-time kanvas mulus 30fps tanpa frame drop,
-  // sementara Safari/iOS otomatis menggunakan MP4/H.264 native.
+  // Prioritaskan H.264/AVC (akselerasi hardware MediaCodec di HP Android Snapdragon/MediaTek)
+  // agar perekaman real-time 24/30fps mulus tanpa thermal throttling, lalu fallback ke VP8/VP9 WebM.
   const candidates = [
+    'video/webm;codecs=h264',
+    'video/mp4;codecs=avc1.42E01E',
+    'video/mp4',
     'video/webm;codecs=vp8',
     'video/webm;codecs=vp9',
     'video/webm',
-    'video/mp4;codecs=avc1.42E01E',
-    'video/mp4',
   ];
   for (const type of candidates) {
     try {
@@ -258,7 +259,7 @@ function drawVideoSourceCoverFast(
   const offsetY = (targetHeight - drawH) / 2;
 
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'medium';
+  ctx.imageSmoothingQuality = 'low';
   ctx.drawImage(source, offsetX, offsetY, drawW, drawH);
 }
 
@@ -468,14 +469,18 @@ export interface LiveTelemetrySnapshot {
 export class RoadSurveyRecorder {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
-  private rawCanvas: HTMLCanvasElement;
-  private rawCtx: CanvasRenderingContext2D | null;
+  private cleanSnapCanvas: HTMLCanvasElement | null = null;
+  private cleanSnapCtx: CanvasRenderingContext2D | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private mimeType = 'video/webm';
   private rafId: number | null = null;
-  private fallbackTimerId: ReturnType<typeof setInterval> | null = null;
-  private captureTrack: (MediaStreamTrack & { requestFrame?: () => void }) | null = null;
+  private vfcId: number | null = null;
+  private vfcVideo: (HTMLVideoElement & {
+    requestVideoFrameCallback?: (cb: (now: number) => void) => number;
+    cancelVideoFrameCallback?: (id: number) => void;
+  }) | null = null;
+  private backgroundTimerId: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private paused = false;
   private phase = 0;
@@ -510,20 +515,13 @@ export class RoadSurveyRecorder {
       this.canvas.getContext('2d', { alpha: false, desynchronized: true }) ||
       this.canvas.getContext('2d', { alpha: false }) ||
       this.canvas.getContext('2d');
-    this.rawCanvas = document.createElement('canvas');
-    this.rawCanvas.width = w;
-    this.rawCanvas.height = h;
-    this.rawCtx =
-      this.rawCanvas.getContext('2d', { alpha: false, desynchronized: true }) ||
-      this.rawCanvas.getContext('2d', { alpha: false }) ||
-      this.rawCanvas.getContext('2d');
     this.getSnapshot = options.getSnapshot;
     this.getVideoEl = options.getVideoEl;
     this.isCameraActive = options.isCameraActive;
     this.getStabilizeCrop = options.getStabilizeCrop ?? (() => false);
-    this.targetFps = options.targetFps ?? 30;
+    this.targetFps = options.targetFps ?? 24;
     this.targetFrameIntervalMs = 1000 / this.targetFps;
-    this.videoBitsPerSecond = options.videoBitsPerSecond ?? 3_000_000;
+    this.videoBitsPerSecond = options.videoBitsPerSecond ?? 2_000_000;
   }
 
   pause() {
@@ -554,14 +552,32 @@ export class RoadSurveyRecorder {
   }
 
   /**
-   * Mengambil salinan frame bersih (tanpa watermark) langsung dari buffer kanvas 2D perekaman
-   * sehingga tidak menyentuh dekoder <video> maupun shutter hardware Camera2 Android.
+   * Mengambil salinan frame bersih (tanpa watermark) secara malas (lazy/on-demand) hanya saat
+   * dibutuhkan (tiap 100m atau pindai AI) sehingga tidak menggandakan salinan kanvas 30x per detik.
    */
   async grabCleanRawBitmap(): Promise<ImageBitmap | null> {
-    if (!this.running || !this.rawCanvas || this.rawCanvas.width === 0) return null;
-    if (typeof createImageBitmap !== 'function') return null;
+    if (!this.running || typeof createImageBitmap !== 'function') return null;
+    const videoEl = this.getVideoEl();
+    if (videoEl && this.isCameraActive() && videoEl.readyState >= 2) {
+      try {
+        return await createImageBitmap(videoEl);
+      } catch {
+        // lanjut fallback kanvas bersih sementara
+      }
+    }
     try {
-      return await createImageBitmap(this.rawCanvas);
+      const w = this.canvas.width || 960;
+      const h = this.canvas.height || 540;
+      if (!this.cleanSnapCanvas || this.cleanSnapCanvas.width !== w || this.cleanSnapCanvas.height !== h) {
+        this.cleanSnapCanvas = document.createElement('canvas');
+        this.cleanSnapCanvas.width = w;
+        this.cleanSnapCanvas.height = h;
+        this.cleanSnapCtx = this.cleanSnapCanvas.getContext('2d', { alpha: false });
+      }
+      if (!this.cleanSnapCtx) return null;
+      const snap = this.getSnapshot();
+      drawRoadSimulationVideoFrame(this.cleanSnapCtx, w, h, this.phase, snap.defects);
+      return await createImageBitmap(this.cleanSnapCanvas);
     } catch {
       return null;
     }
@@ -577,21 +593,16 @@ export class RoadSurveyRecorder {
 
     const snap = this.getSnapshot();
     const videoEl = this.getVideoEl();
-    const drawTarget = this.rawCtx || this.ctx;
 
     if (videoEl && this.isCameraActive() && videoEl.readyState >= 2) {
-      drawVideoSourceCoverFast(drawTarget, videoEl, w, h, this.getStabilizeCrop());
+      drawVideoSourceCoverFast(this.ctx, videoEl, w, h, this.getStabilizeCrop());
     } else {
       const stepSpeed = snap.speedKmh > 0 ? Math.max(3, snap.speedKmh) : 0;
       if (stepSpeed > 0) {
         // Skala kecepatan halus berbasis delta-time (phase/detik)
         this.phase = (this.phase + (stepSpeed / 40) * 0.65 * dtSec) % 1;
       }
-      drawRoadSimulationVideoFrame(drawTarget, w, h, this.phase, snap.defects);
-    }
-
-    if (this.rawCtx) {
-      this.ctx.drawImage(this.rawCanvas, 0, 0);
+      drawRoadSimulationVideoFrame(this.ctx, w, h, this.phase, snap.defects);
     }
 
     // Watermark di kiri bawah tanpa frame (di-cache agar tidak memicu shadowBlur per frame)
@@ -606,22 +617,42 @@ export class RoadSurveyRecorder {
     if (!this.thumbnailUrl) {
       this.thumbnailUrl = createCompactVideoThumbnail(this.canvas);
     }
+  }
 
-    if (this.captureTrack && typeof this.captureTrack.requestFrame === 'function') {
-      try {
-        this.captureTrack.requestFrame();
-      } catch {
-        // ignore requestFrame error
-      }
+  private scheduleNextRender() {
+    if (!this.running) return;
+    const videoEl = this.getVideoEl() as
+      | (HTMLVideoElement & {
+          requestVideoFrameCallback?: (cb: (now: number) => void) => number;
+        })
+      | null;
+
+    if (
+      videoEl &&
+      this.isCameraActive() &&
+      typeof videoEl.requestVideoFrameCallback === 'function'
+    ) {
+      this.vfcVideo = videoEl;
+      this.vfcId = videoEl.requestVideoFrameCallback((nowMs) => {
+        this.vfcId = null;
+        if (!this.running) return;
+        if (!this.paused && nowMs - this.lastDrawMs >= this.targetFrameIntervalMs - 4) {
+          this.renderOneFrame(nowMs);
+        }
+        this.scheduleNextRender();
+      });
+      return;
     }
+
+    this.rafId = requestAnimationFrame(this.drawLoop);
   }
 
   private drawLoop = (nowMs: number) => {
     if (!this.running) return;
-    if (!this.paused && nowMs - this.lastDrawMs >= this.targetFrameIntervalMs - 2) {
+    if (!this.paused && nowMs - this.lastDrawMs >= this.targetFrameIntervalMs - 4) {
       this.renderOneFrame(nowMs);
     }
-    this.rafId = requestAnimationFrame(this.drawLoop);
+    this.scheduleNextRender();
   };
 
   private stopLoops() {
@@ -629,9 +660,22 @@ export class RoadSurveyRecorder {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-    if (this.fallbackTimerId !== null) {
-      clearInterval(this.fallbackTimerId);
-      this.fallbackTimerId = null;
+    if (
+      this.vfcId !== null &&
+      this.vfcVideo &&
+      typeof this.vfcVideo.cancelVideoFrameCallback === 'function'
+    ) {
+      try {
+        this.vfcVideo.cancelVideoFrameCallback(this.vfcId);
+      } catch {
+        // ignore
+      }
+    }
+    this.vfcId = null;
+    this.vfcVideo = null;
+    if (this.backgroundTimerId !== null) {
+      clearInterval(this.backgroundTimerId);
+      this.backgroundTimerId = null;
     }
   }
 
@@ -652,30 +696,17 @@ export class RoadSurveyRecorder {
       mozCaptureStream?: (fps?: number) => MediaStream;
     };
 
-    // Gunakan captureStream(0) + requestFrame() jika didukung agar tiap frame terkirim presisi 30fps
-    // tanpa tearing/duplikasi, fallback ke captureStream(30).
+    // Gunakan fixed-FPS captureStream(targetFps) agar muxer MediaRecorder Android menerima
+    // timestamp CFR yang stabil dan tidak tersendat-sendat.
     let stream: MediaStream | null = null;
-    if (canvasAny.captureStream) {
-      try {
-        const probeStream = canvasAny.captureStream(0);
-        const probeTrack = probeStream.getVideoTracks()[0] as
-          | (MediaStreamTrack & { requestFrame?: () => void })
-          | undefined;
-        if (probeTrack && typeof probeTrack.requestFrame === 'function') {
-          stream = probeStream;
-          this.captureTrack = probeTrack;
-        } else {
-          probeStream.getTracks().forEach((t) => t.stop());
-          stream = canvasAny.captureStream(this.targetFps);
-          this.captureTrack = null;
-        }
-      } catch {
+    try {
+      if (canvasAny.captureStream) {
         stream = canvasAny.captureStream(this.targetFps);
-        this.captureTrack = null;
+      } else if (canvasAny.mozCaptureStream) {
+        stream = canvasAny.mozCaptureStream(this.targetFps);
       }
-    } else if (canvasAny.mozCaptureStream) {
-      stream = canvasAny.mozCaptureStream(this.targetFps);
-      this.captureTrack = null;
+    } catch {
+      stream = null;
     }
 
     if (!stream) {
@@ -705,7 +736,6 @@ export class RoadSurveyRecorder {
       } catch {
         this.running = false;
         this.stopLoops();
-        this.captureTrack = null;
         try {
           stream.getTracks().forEach((t) => t.stop());
         } catch {
@@ -721,14 +751,17 @@ export class RoadSurveyRecorder {
       }
     };
 
+    this.mediaRecorder.onerror = () => {
+      // Abaikan error minor codec tanpa menjatuhkan UI; chunks yang sudah ada tetap aman
+    };
+
     try {
-      // Timeslice 1000ms mengurangi beban flush muxer agar encoding tetap mulus
+      // Timeslice 1000ms menjaga beban flush muxer tetap ringan & mencegah kehabisan RAM di Android
       this.mediaRecorder.start(1000);
     } catch {
       this.running = false;
       this.mediaRecorder = null;
       this.stopLoops();
-      this.captureTrack = null;
       try {
         stream.getTracks().forEach((t) => t.stop());
       } catch {
@@ -737,15 +770,17 @@ export class RoadSurveyRecorder {
       return false;
     }
 
-    this.rafId = requestAnimationFrame(this.drawLoop);
-    // Penjaga bila tab sempat ter-throttle agar frame stream tetap mengalir konsisten 30fps
-    this.fallbackTimerId = setInterval(() => {
+    this.scheduleNextRender();
+
+    // Penjaga hanya saat tab/layar di latar belakang agar rAF tidak bentrok di foreground
+    this.backgroundTimerId = setInterval(() => {
       if (!this.running || this.paused) return;
+      if (typeof document !== 'undefined' && !document.hidden) return;
       const now = performance.now();
-      if (now - this.lastDrawMs >= this.targetFrameIntervalMs * 1.4) {
+      if (now - this.lastDrawMs >= 200) {
         this.renderOneFrame(now);
       }
-    }, 34);
+    }, 250);
 
     return true;
   }
@@ -757,7 +792,6 @@ export class RoadSurveyRecorder {
     this.running = false;
     this.paused = false;
     this.stopLoops();
-    this.captureTrack = null;
 
     const recorder = this.mediaRecorder;
     this.mediaRecorder = null;
@@ -798,8 +832,12 @@ export class RoadSurveyRecorder {
     }
 
     this.watermarkCache.dispose();
-    this.rawCanvas.width = 0;
-    this.rawCanvas.height = 0;
+    if (this.cleanSnapCanvas) {
+      this.cleanSnapCanvas.width = 0;
+      this.cleanSnapCanvas.height = 0;
+      this.cleanSnapCanvas = null;
+      this.cleanSnapCtx = null;
+    }
 
     const actualType =
       this.chunks[0]?.type || recorder.mimeType || this.mimeType || 'video/webm';
@@ -846,25 +884,10 @@ export async function generateFallbackRoadVideoEntry(video: {
   if (!canvasAny.captureStream) return null;
 
   let stream: MediaStream;
-  let track: (MediaStreamTrack & { requestFrame?: () => void }) | null = null;
   try {
-    const probeStream = canvasAny.captureStream(0);
-    const probeTrack = probeStream.getVideoTracks()[0] as
-      | (MediaStreamTrack & { requestFrame?: () => void })
-      | undefined;
-    if (probeTrack && typeof probeTrack.requestFrame === 'function') {
-      stream = probeStream;
-      track = probeTrack;
-    } else {
-      probeStream.getTracks().forEach((t) => t.stop());
-      stream = canvasAny.captureStream(30);
-    }
+    stream = canvasAny.captureStream(24);
   } catch {
-    try {
-      stream = canvasAny.captureStream(30);
-    } catch {
-      return null;
-    }
+    return null;
   }
 
   const bestMime = getBestSupportedVideoMimeType();
@@ -873,8 +896,8 @@ export async function generateFallbackRoadVideoEntry(video: {
 
   try {
     recorder = bestMime
-      ? new MediaRecorder(stream, { mimeType: bestMime, videoBitsPerSecond: 2_200_000 })
-      : new MediaRecorder(stream, { videoBitsPerSecond: 2_200_000 });
+      ? new MediaRecorder(stream, { mimeType: bestMime, videoBitsPerSecond: 1_800_000 })
+      : new MediaRecorder(stream, { videoBitsPerSecond: 1_800_000 });
   } catch {
     try {
       recorder = new MediaRecorder(stream);
@@ -896,8 +919,8 @@ export async function generateFallbackRoadVideoEntry(video: {
   const watermarkCache = new WatermarkStripCache();
   let phase = 0;
   let frame = 0;
-  const totalFrames = 90; // 3 detik mulus pada 30fps
-  const frameIntervalMs = 1000 / 30;
+  const totalFrames = 72; // 3 detik mulus pada 24fps
+  const frameIntervalMs = 1000 / 24;
 
   try {
     recorder.start(1000);
@@ -926,8 +949,8 @@ export async function generateFallbackRoadVideoEntry(video: {
 
     const step = (nowMs: number) => {
       if (resolved) return;
-      if (lastMs === 0 || nowMs - lastMs >= frameIntervalMs - 2) {
-        const dtSec = lastMs > 0 ? Math.min(0.08, (nowMs - lastMs) / 1000) : 1 / 30;
+      if (lastMs === 0 || nowMs - lastMs >= frameIntervalMs - 4) {
+        const dtSec = lastMs > 0 ? Math.min(0.08, (nowMs - lastMs) / 1000) : 1 / 24;
         lastMs = nowMs;
 
         phase = (phase + 0.6 * dtSec) % 1;
@@ -941,14 +964,6 @@ export async function generateFallbackRoadVideoEntry(video: {
           lat: -2.045,
           lng: 99.598,
         });
-
-        if (track && typeof track.requestFrame === 'function') {
-          try {
-            track.requestFrame();
-          } catch {
-            // ignore
-          }
-        }
 
         frame++;
         if (frame >= totalFrames) {

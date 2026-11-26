@@ -14,6 +14,7 @@ import android.util.Base64;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
@@ -80,11 +81,13 @@ public class MainActivity extends BridgeActivity {
         final OutputStream outputStream;
         final Uri mediaUri;
         final File legacyFile;
+        final String filename;
 
-        DownloadSession(OutputStream outputStream, Uri mediaUri, File legacyFile) {
+        DownloadSession(OutputStream outputStream, Uri mediaUri, File legacyFile, String filename) {
             this.outputStream = outputStream;
             this.mediaUri = mediaUri;
             this.legacyFile = legacyFile;
+            this.filename = filename;
         }
     }
 
@@ -129,7 +132,7 @@ public class MainActivity extends BridgeActivity {
                     if (os == null) return "";
 
                     String id = UUID.randomUUID().toString();
-                    sessions.put(id, new DownloadSession(os, uri, null));
+                    sessions.put(id, new DownloadSession(os, uri, null, filename));
                     return id;
                 } else {
                     File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -140,7 +143,7 @@ public class MainActivity extends BridgeActivity {
                     File outFile = new File(targetDir, filename);
                     OutputStream os = new FileOutputStream(outFile, false);
                     String id = UUID.randomUUID().toString();
-                    sessions.put(id, new DownloadSession(os, null, outFile));
+                    sessions.put(id, new DownloadSession(os, null, outFile, filename));
                     return id;
                 }
             } catch (Exception e) {
@@ -188,6 +191,13 @@ public class MainActivity extends BridgeActivity {
                             null
                         );
                     }
+                    runOnUiThread(() ->
+                        Toast.makeText(
+                            MainActivity.this,
+                            "Tersimpan: Download/SurveyJalanMentawai/" + session.filename,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    );
                     return true;
                 } catch (IOException e) {
                     return false;

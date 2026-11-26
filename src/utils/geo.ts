@@ -1,5 +1,6 @@
 import { RuasJalan, SurveyPhoto } from '../types';
 import { formatMeterToSTA, getRuasSTASegments } from './pkrms';
+import { triggerBlobDownload } from './nativeDownload';
 
 function escapeXml(value: unknown): string {
   return String(value ?? '')
@@ -669,12 +670,5 @@ export function generateExcelXML(ruasList: RuasJalan[], photos: SurveyPhoto[]): 
  */
 export function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(blob, filename);
 }

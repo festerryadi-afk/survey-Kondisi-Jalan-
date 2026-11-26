@@ -183,12 +183,12 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">
+        <div className="bg-slate-950 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-[11px] sm:text-xs font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
               {photo ? `FOTO 3R 600 DPI • ${photo.staText}` : `VIDEO *.MP4 • ${video?.nomorRuas}`}
             </span>
-            <h3 className="font-bold text-sm sm:text-base text-white truncate max-w-md">
+            <h3 className="font-bold text-xs sm:text-base text-white truncate max-w-[180px] sm:max-w-md">
               {photo ? `${photo.nomorRuas} - ${photo.ruasNama}` : `${video?.nomorRuas} - ${video?.ruasNama}`}
             </h3>
           </div>
@@ -249,7 +249,7 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
               type="button"
               onClick={handleDownload}
               disabled={isDownloading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow cursor-pointer disabled:opacity-60"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] sm:text-xs font-bold transition shadow cursor-pointer disabled:opacity-60"
               title={photo ? "Unduh File Beresolusi HD 600 DPI (3000 × 2102 px / 3R)" : "Unduh Rekaman Video Survei"}
             >
               <Download className="w-3.5 h-3.5" />
@@ -277,7 +277,7 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
         {/* Modal Content: Media Display + Metadata Panel */}
         <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-800">
           {/* Left: Media Viewport with exact 3R (8,9 × 12,7 cm) proportions */}
-          <div className="md:col-span-8 bg-black flex flex-col items-center justify-center p-4 relative min-h-[320px]">
+          <div className="md:col-span-8 bg-black flex flex-col items-center justify-center p-2.5 sm:p-4 relative min-h-[200px] sm:min-h-[320px]">
             {photo && (
               <div className="w-full max-w-[680px] aspect-[127/89] rounded-lg overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 relative">
                 <img
@@ -304,7 +304,7 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
                     autoPlay
                     playsInline
                     onError={handleVideoPlaybackError}
-                    className="max-h-[65vh] w-full rounded bg-black"
+                    className="max-h-[42vh] sm:max-h-[65vh] w-full rounded bg-black"
                   />
                 )}
               </div>

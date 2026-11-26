@@ -2,6 +2,7 @@ import type { jsPDF } from 'jspdf';
 import { RuasJalan, SurveyPhoto } from '../types';
 import { formatMeterToSTA, getRuasSTASegments } from './pkrms';
 import { comparePhotosByStaAsc } from './geo';
+import { triggerBlobDownload } from './nativeDownload';
 
 /**
  * Utilitas Foto HD 600 DPI ukuran cetak 3R (8,9 × 12,7 cm)
@@ -408,18 +409,44 @@ export async function renderPhotoTo3R600DPI(
 /**
  * Mengunduh foto dalam format *.JPG HD 600 DPI (3000 × 2102 px / ukuran cetak 3R 8,9 × 12,7 cm)
  */
+function dataUrlToBlobSync(dataUrl: string): Blob {
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx === -1 || !dataUrl.startsWith('data:')) {
+    throw new Error('Invalid data URL');
+  }
+  const meta = dataUrl.slice(5, commaIdx);
+  const mime = meta.split(';')[0] || 'application/octet-stream';
+  const payload = dataUrl.slice(commaIdx + 1);
+  if (!meta.includes(';base64')) {
+    return new Blob([decodeURIComponent(payload)], { type: mime });
+  }
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
 export async function downloadPhoto3R600DPI(
   sourceUrl: string,
   filename: string,
   photoId?: string
 ) {
   const hdDataUrl = await renderPhotoTo3R600DPI(sourceUrl, photoId);
-  const link = document.createElement('a');
-  link.href = hdDataUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  try {
+    const blob = hdDataUrl.startsWith('data:')
+      ? dataUrlToBlobSync(hdDataUrl)
+      : await (await fetch(hdDataUrl)).blob();
+    triggerBlobDownload(blob, filename);
+  } catch {
+    const link = document.createElement('a');
+    link.href = hdDataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 /**
@@ -434,41 +461,11 @@ function toPdfSafeText(value: unknown): string {
 }
 
 /**
- * Mengunduh dokumen jsPDF dengan Blob URL & <a download> terpasang ke DOM (aman di iframe & mobile)
+ * Mengunduh dokumen jsPDF melalui triggerBlobDownload (aman di Android APK, iframe & mobile)
  */
 function savePdfDocument(doc: jsPDF, filename: string) {
-  try {
-    const pdfBlob = doc.output('blob');
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    link.rel = 'noopener';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-    }, 100);
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 60_000);
-  } catch {
-    const dataUri = doc.output('datauristring');
-    const link = document.createElement('a');
-    link.href = dataUri;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-    }, 100);
-  }
+  const pdfBlob = doc.output('blob');
+  triggerBlobDownload(pdfBlob, filename);
 }
 
 /**

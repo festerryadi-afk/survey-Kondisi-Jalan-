@@ -115,6 +115,7 @@ export function isRoadDamageAiOnQuotaCooldown(): boolean {
 
 /**
  * Mengirimkan foto ke endpoint server /api/analyze-road-photo untuk deteksi otomatis tingkat kerusakan jalan.
+ * Mendukung deteksi otomatis runtime APK mandiri (tanpa backend lokal) agar tidak memicu error HTTP 404.
  */
 export async function analyzeRoadDamageFromPhoto(
   imageSourceUrl: string,
@@ -129,16 +130,51 @@ export async function analyzeRoadDamageFromPhoto(
     );
   }
 
-  const preparedDataUrl = await prepareAnalysisImageDataUrl(imageSourceUrl);
+  const envObj = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const configuredBaseUrl = (envObj?.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  const isNativeApk =
+    typeof window !== 'undefined' &&
+    Boolean((window as Window & { MentawaiAndroidDownloader?: unknown }).MentawaiAndroidDownloader);
 
-  const res = await fetch('/api/analyze-road-photo', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      imageDataUrl: preparedDataUrl,
-      surfaceTypeHint,
-    }),
-  });
+  if (isNativeApk && !configuredBaseUrl) {
+    throw new RoadDamageAIError(
+      'Mode APK Mandiri (Offline PKRMS): Penilaian kondisi jalan menggunakan standar PKRMS lokal perangkat.',
+      503,
+      'OFFLINE_APK_NO_SERVER'
+    );
+  }
+
+  const preparedDataUrl = await prepareAnalysisImageDataUrl(imageSourceUrl);
+  const endpointUrl = configuredBaseUrl
+    ? `${configuredBaseUrl}/api/analyze-road-photo`
+    : '/api/analyze-road-photo';
+
+  let res: Response;
+  try {
+    res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageDataUrl: preparedDataUrl,
+        surfaceTypeHint,
+      }),
+    });
+  } catch {
+    throw new RoadDamageAIError(
+      'Server analisis AI tidak terjangkau. Menggunakan penilaian PKRMS lokal perangkat.',
+      0,
+      'OFFLINE_APK_NO_SERVER'
+    );
+  }
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  if (!res.ok && !contentType.includes('application/json')) {
+    throw new RoadDamageAIError(
+      'Server AI cloud tidak tersedia pada paket aplikasi ini. Penilaian beralih ke PKRMS lokal.',
+      res.status,
+      'OFFLINE_APK_NO_SERVER'
+    );
+  }
 
   const payload = (await res.json().catch(() => ({}))) as Partial<RoadDamageAnalysisResult> & {
     error?: string;

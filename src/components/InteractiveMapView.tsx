@@ -676,12 +676,12 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
   const activeRuas = ruasList.find((r) => r.id === selectedRuasId) || ruasList[0];
 
   return (
-    <div className="flex flex-col flex-1 h-[calc(100vh-116px)] min-h-[540px] bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex flex-col flex-1 h-auto min-h-[calc(100vh-116px)] md:h-[calc(100vh-116px)] bg-slate-950 text-slate-100 overflow-y-auto md:overflow-hidden">
       {/* Compact Proportional Toolbar */}
-      <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 shrink-0 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-slate-900 border-b border-slate-800 px-2.5 sm:px-4 py-1.5 sm:py-2 shrink-0 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           {/* Refined and compact proportional title frame */}
-          <div className="flex items-center gap-2.5 bg-slate-950/70 px-3 py-1.5 rounded-md border border-slate-700/80">
+          <div className="flex items-center gap-2 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md border border-slate-700/80">
             <Compass className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="font-bold text-xs sm:text-sm text-slate-100 tracking-wide">
               Peta Ruas Jalan Kab. Kep. Mentawai
@@ -889,7 +889,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       </div>
 
       {/* Main Map Body: Sidebar List + Map Viewport */}
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+      <div className="flex-1 min-h-[360px] md:min-h-0 flex overflow-hidden relative">
         {/* Left Side: Ruas Selector & Detail Panel */}
         <div className={`${mobileTab === 'list' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 bg-slate-900/95 border-r border-slate-800 flex-col shrink-0 z-10 overflow-hidden`}>
           <div className="p-3 border-b border-slate-800 bg-slate-950/40">
@@ -1249,7 +1249,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
         </div>
 
         {/* Map Viewport Container (Explicit non-zero height guaranteed across Mobile, Tablet, PC) */}
-        <div className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-1 min-h-[460px] sm:min-h-[540px] h-full relative bg-slate-900`}>
+        <div className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-1 min-h-[360px] sm:min-h-[540px] h-full relative bg-slate-900`}>
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
           {/* Top-Right Quick Map Controls (Fit All & GPS Locate) */}

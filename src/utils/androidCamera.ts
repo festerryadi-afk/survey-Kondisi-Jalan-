@@ -142,14 +142,12 @@ export function buildAndroidGetUserMediaConstraints(
   settings: AndroidCameraSettings
 ): MediaStreamConstraints {
   const { width, height } = getResolutionDimensions(settings.resolution);
-  const minFps = Math.min(24, settings.targetFps);
 
   const videoConstraints: MediaTrackConstraints = {
     width: { ideal: width },
     height: { ideal: height },
     frameRate: {
       ideal: settings.targetFps,
-      min: minFps,
       max: settings.targetFps,
     },
   };

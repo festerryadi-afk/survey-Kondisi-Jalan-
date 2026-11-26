@@ -1177,45 +1177,60 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       const staNow = Math.round(staRef.current);
       const surfaceHint = getSurfaceAndConditionAtSTA(activeRuas, staNow).tipePermukaan;
 
-      if (isOnline) {
-        const result = await analyzeRoadDamageFromPhoto(frameDataUrl, surfaceHint, {
-          isBackground: Boolean(options?.silent),
-        });
-        if (!aiDetectionEnabledRef.current) return;
-        detectedDefectsRef.current = result.defects;
-        setDetectedDefects(result.defects);
-        setAiLastSummary(`${result.condition}: ${result.summary}`);
-
-        if (result.condition === 'Rusak Berat' || result.condition === 'Rusak Ringan') {
-          playAlertSound(result.condition === 'Rusak Berat');
-          if (!options?.silent || result.condition === 'Rusak Berat') {
-            onTriggerAlert(
-              `Deteksi AI Live: ${result.condition}`,
-              `${activeRuas.namaRuas} (${formatSTA(staNow)}): ${result.summary}`,
-              activeRuas.id,
-              formatSTA(staNow)
-            );
-          }
-        }
-      } else {
-        // Offline local PKRMS evaluation
+      const applyLocalPkrmsEvaluation = () => {
         const staInfo = getSurfaceAndConditionAtSTA(activeRuas, staNow);
         if (staInfo.kondisiJalan === 'Rusak Berat' || staInfo.kondisiJalan === 'Rusak Ringan') {
           const offlineDefect: DefectItem = {
             id: `ai-offline-${Date.now()}`,
-            type: staInfo.kondisiJalan === 'Rusak Berat' ? 'Lubang (Pothole)' : 'Retak Buaya (Alligator Cracking)',
+            type:
+              staInfo.kondisiJalan === 'Rusak Berat'
+                ? 'Lubang (Pothole)'
+                : 'Retak Buaya (Alligator Cracking)',
             severity: staInfo.kondisiJalan === 'Rusak Berat' ? 'Berat' : 'Sedang',
             confidence: 0.85,
           };
           detectedDefectsRef.current = [offlineDefect];
           setDetectedDefects([offlineDefect]);
           playAlertSound(staInfo.kondisiJalan === 'Rusak Berat');
-          setAiLastSummary(`Mode Offline PKRMS: ${staInfo.kondisiJalan} (${staInfo.tipePermukaan})`);
+          setAiLastSummary(`PKRMS Lokal: ${staInfo.kondisiJalan} (${staInfo.tipePermukaan})`);
         } else {
           detectedDefectsRef.current = [];
           setDetectedDefects([]);
-          setAiLastSummary(`Mode Offline PKRMS: ${staInfo.kondisiJalan} (${staInfo.tipePermukaan})`);
+          setAiLastSummary(`PKRMS Lokal: ${staInfo.kondisiJalan} (${staInfo.tipePermukaan})`);
         }
+      };
+
+      if (isOnline) {
+        try {
+          const result = await analyzeRoadDamageFromPhoto(frameDataUrl, surfaceHint, {
+            isBackground: Boolean(options?.silent),
+          });
+          if (!aiDetectionEnabledRef.current) return;
+          detectedDefectsRef.current = result.defects;
+          setDetectedDefects(result.defects);
+          setAiLastSummary(`${result.condition}: ${result.summary}`);
+
+          if (result.condition === 'Rusak Berat' || result.condition === 'Rusak Ringan') {
+            playAlertSound(result.condition === 'Rusak Berat');
+            if (!options?.silent || result.condition === 'Rusak Berat') {
+              onTriggerAlert(
+                `Deteksi AI Live: ${result.condition}`,
+                `${activeRuas.namaRuas} (${formatSTA(staNow)}): ${result.summary}`,
+                activeRuas.id,
+                formatSTA(staNow)
+              );
+            }
+          }
+        } catch (aiErr) {
+          const errCode = (aiErr as { code?: string })?.code;
+          if (errCode === 'OFFLINE_APK_NO_SERVER' || options?.silent) {
+            applyLocalPkrmsEvaluation();
+          } else {
+            throw aiErr;
+          }
+        }
+      } else {
+        applyLocalPkrmsEvaluation();
       }
     } catch (err) {
       if (!options?.silent) {
@@ -1329,6 +1344,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             source: fallbackSource,
             drawFallbackSim: (ctx, w, h) => drawSimulatedRoadFrame(ctx, w, h, activeDefects),
             watermark: watermarkMeta,
+            compactFallback: isVideoRecordingNow,
           });
           hd600DpiDataUrl = fallbackEncoded.hd600DpiDataUrl;
           dataUrl = fallbackEncoded.storageDataUrl;
@@ -1352,6 +1368,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           source: null,
           drawFallbackSim: (ctx, w, h) => drawSimulatedRoadFrame(ctx, w, h, activeDefects),
           watermark: watermarkMeta,
+          compactFallback: isRecordingVideoRef.current,
         });
         hd600DpiDataUrl = fallbackEncoded.hd600DpiDataUrl;
         dataUrl = fallbackEncoded.storageDataUrl;
@@ -1434,6 +1451,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         })
         .catch((err) => {
           const errObj = err as Error & { status?: number; code?: string };
+          if (errObj?.code === 'OFFLINE_APK_NO_SERVER') {
+            return;
+          }
           const msg =
             errObj instanceof Error
               ? errObj.message
@@ -1597,12 +1617,23 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     activeRecordingRuasRef.current = activeRuas;
 
     const activeCamSettings = androidCameraSettingsRef.current;
+    const isCompactAndroid =
+      typeof navigator !== 'undefined' &&
+      (/Android/i.test(navigator.userAgent) ||
+        (typeof window !== 'undefined' && window.innerWidth <= 480));
     const recDims =
-      activeCamSettings.resolution === '540p'
+      activeCamSettings.resolution === '540p' ||
+      (isCompactAndroid && activeCamSettings.resolution !== '1080p')
         ? getResolutionDimensions('540p')
         : getResolutionDimensions('720p');
+    const recFps = isCompactAndroid
+      ? Math.min(24, activeCamSettings.targetFps)
+      : activeCamSettings.targetFps;
 
     const activeStorageSettings = loadDeviceStorageSettings();
+    const rawBitrate = getVideoBitrateBps(activeStorageSettings.videoBitratePreset);
+    const recBitrate = isCompactAndroid ? Math.min(1_600_000, rawBitrate) : rawBitrate;
+
     const recorder = new RoadSurveyRecorder({
       getSnapshot: () => ({
         nomorRuas: (activeRecordingRuasRef.current || currentRuasRef.current)?.nomorRuas || activeRuas.nomorRuas,
@@ -1618,8 +1649,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       getStabilizeCrop: () => androidCameraSettingsRef.current.eisCropMargin,
       width: recDims.width,
       height: recDims.height,
-      targetFps: activeCamSettings.targetFps,
-      videoBitsPerSecond: getVideoBitrateBps(activeStorageSettings.videoBitratePreset),
+      targetFps: recFps,
+      videoBitsPerSecond: recBitrate,
     });
 
     const started = recorder.start();
@@ -1987,7 +2018,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       className={
         isSurveyRunning
           ? 'fixed inset-0 z-40 flex flex-col bg-black text-slate-100 overflow-hidden'
-          : 'flex flex-col flex-1 h-full min-h-[calc(100vh-115px)] bg-slate-950 text-slate-100 overflow-hidden'
+          : 'flex flex-col flex-1 min-h-0 md:min-h-[calc(100vh-115px)] bg-slate-950 text-slate-100 overflow-y-auto md:overflow-hidden'
       }
     >
       {/* 
@@ -1995,16 +2026,16 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         Disembunyikan saat survei berjalan agar layar depan hanya menampilkan kamera realtime
       */}
       {!isSurveyRunning && (
-      <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-2 flex flex-col gap-2 shrink-0 shadow-lg z-20 backdrop-blur-md">
+      <div className="bg-slate-900/95 border-b border-slate-800 px-2.5 sm:px-4 py-1.5 sm:py-2 flex flex-col gap-1.5 sm:gap-2 shrink-0 shadow-lg z-20 backdrop-blur-md">
         {/* Row 1: Ruas Selector, STA, Speed, GPS, and Recording badge */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs">
           {/* Ruas Selector */}
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-amber-400 whitespace-nowrap">Ruas:</span>
+          <div className="flex items-center gap-1.5 w-full sm:w-auto min-w-0">
+            <span className="font-semibold text-amber-400 whitespace-nowrap shrink-0">Ruas:</span>
             <select
               value={selectedRuasId}
               onChange={(e) => setSelectedRuasId(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-white font-medium text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+              className="w-full sm:w-auto max-w-full min-w-0 flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white font-medium text-[11px] sm:text-xs truncate focus:ring-1 focus:ring-amber-500 focus:outline-none"
             >
               {ruasList.map((ruas) => (
                 <option key={ruas.id} value={ruas.id}>
@@ -2015,18 +2046,18 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           </div>
 
           {/* Current STA & Speed */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2.5 py-1 rounded border border-slate-700">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-700">
               <span className="text-slate-400">STA:</span>
-              <span className="font-mono font-bold text-sky-400 text-sm">
+              <span className="font-mono font-bold text-sky-400 text-xs sm:text-sm">
                 {formatSTA(currentSta)}
               </span>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
                 / {formatSTA(Math.max(1, Math.round(currentRuas.panjangKm * 1000)))}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2.5 py-1 rounded border border-slate-700">
+            <div className="flex items-center gap-1.5 bg-slate-800/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-700">
               {useSimulationDriving && simulationMode === 'walking' ? (
                 <Footprints className="w-3.5 h-3.5 text-emerald-400" />
               ) : useSimulationDriving && simulationMode === 'motorcycle' ? (
@@ -2054,7 +2085,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
             {/* Video Recording Status Badge in top bar (not blocking camera) */}
             {isRecordingVideo && (
-              <div className="flex items-center gap-1.5 bg-rose-600 px-2.5 py-1 rounded border border-rose-400 text-white font-bold text-xs animate-pulse">
+              <div className="flex items-center gap-1.5 bg-rose-600 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-rose-400 text-white font-bold text-[11px] sm:text-xs animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-white" />
                 <span>MEREKAM ({videoElapsedSec}s)</span>
               </div>
@@ -2062,8 +2093,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           </div>
 
           {/* Geotagging GPS */}
-          <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px] bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800">
-            <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+          <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[10px] sm:text-[11px] bg-slate-950/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-slate-800">
+            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400 shrink-0" />
             <span>
               {currentCoord.lat.toFixed(6)}°, {currentCoord.lng.toFixed(6)}°
             </span>
@@ -2075,9 +2106,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         </div>
 
         {/* Row 2: 100m Auto-Capture Progress Bar & Real-time AI Status */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 items-center text-[11px] sm:text-xs">
           {/* 100m Auto-Capture Progress bar */}
-          <div className="md:col-span-6 flex items-center gap-3 bg-slate-950/70 px-3 py-1.5 rounded border border-slate-800">
+          <div className="md:col-span-6 flex items-center gap-2 sm:gap-3 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-slate-800">
             <div className="flex items-center gap-1.5 shrink-0">
               <Camera className="w-3.5 h-3.5 text-amber-400" />
               <span className="font-semibold text-slate-200">
@@ -2085,7 +2116,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               </span>
             </div>
 
-            <div className="flex-1 bg-slate-800 h-2.5 rounded-full overflow-hidden relative">
+            <div className="flex-1 bg-slate-800 h-2 sm:h-2.5 rounded-full overflow-hidden relative">
               <div 
                 className={`h-full transition-all duration-300 ${
                   progressPercent >= 90 ? 'bg-amber-400 animate-pulse' : 'bg-sky-500'
@@ -2094,13 +2125,13 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               />
             </div>
 
-            <span className="font-mono text-amber-300 text-xs font-semibold shrink-0">
+            <span className="font-mono text-amber-300 text-[11px] sm:text-xs font-semibold shrink-0">
               {Math.round(distanceSinceLastCapture)}m / 100m
             </span>
           </div>
 
           {/* Real-time AI Detection Status banner (Interactive Active Controls) */}
-          <div className="md:col-span-6 flex items-center justify-between gap-2 bg-slate-950/70 px-3 py-1.5 rounded border border-slate-800">
+          <div className="md:col-span-6 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2 bg-slate-950/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-slate-800">
             <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
               <button
                 type="button"
@@ -2259,7 +2290,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         </div>
 
         {/* Row 3: GPS Route Tracker (100m), Non-100m STA Akhir Input & Export Excel / KML / KMZ */}
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/75 px-3 py-1.5 rounded border border-cyan-500/30 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-slate-950/75 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-cyan-500/30 text-[11px] sm:text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
               <Route className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -2364,7 +2395,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         MAIN CAMERA / VIDEO VIEWPORT:
         100% BERSIH DARI TULISAN - Bebas dari tulisan overlay sehingga tidak menutupi display kamera
       */}
-      <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
+      <div className="relative flex-1 min-h-[230px] sm:min-h-[300px] bg-black overflow-hidden flex items-center justify-center">
         {/* Real Camera Video Element */}
         <video
           ref={videoRef}
@@ -2394,11 +2425,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         Saat survei berjalan hanya menampilkan tombol Pause & Berhenti di bawah layar kamera realtime
       */}
       {isSurveyRunning ? (
-        <div className="bg-slate-950/95 border-t border-slate-800/80 px-4 py-3 shrink-0 flex items-center justify-center gap-4">
+        <div className="bg-slate-950/95 border-t border-slate-800/80 px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0 flex items-center justify-center gap-3">
           <button
             type="button"
             onClick={handleTogglePauseSurvey}
-            className={`flex items-center justify-center gap-2 min-w-[140px] px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition cursor-pointer ${
+            className={`flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer ${
               isSurveyPaused
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
@@ -2420,22 +2451,22 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           <button
             type="button"
             onClick={handleStopAutoSurvey}
-            className="flex items-center justify-center gap-2 min-w-[140px] px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg transition cursor-pointer"
+            className="flex-1 max-w-[165px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer"
           >
             <Square className="w-4 h-4 fill-current" />
             <span>Berhenti</span>
           </button>
         </div>
       ) : (
-      <div className="bg-slate-900 border-t border-slate-800 p-3 shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-slate-900 border-t border-slate-800 p-2.5 sm:p-3 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           {/* Survey Execution & Separated Photo/Video Feature Mode */}
           <div className="flex flex-wrap items-center gap-2">
             {!isSurveyRunning ? (
               <button
                 type="button"
                 onClick={handleStartAutoSurvey}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition cursor-pointer"
+                className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-current" />
                 <span>
@@ -2707,16 +2738,17 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
   );
 };
 
-// Simulation Road Canvas Component
+// Simulation Road Canvas Component (memoized to avoid re-renders on telemetry updates)
 const SimulatedRoadCanvas: React.FC<{
   defects: DefectItem[];
   isMoving: boolean;
   speed: number;
   batterySaver: boolean;
-}> = ({ defects, isMoving, speed, batterySaver }) => {
+}> = React.memo(({ defects, isMoving, speed, batterySaver }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<number>(0);
   const latestPropsRef = useRef({ defects, isMoving, speed, batterySaver });
+  const isCompactCanvas = typeof window !== 'undefined' && window.innerWidth <= 480;
 
   useEffect(() => {
     latestPropsRef.current = { defects, isMoving, speed, batterySaver };
@@ -2777,9 +2809,9 @@ const SimulatedRoadCanvas: React.FC<{
   return (
     <canvas
       ref={canvasRef}
-      width={1280}
-      height={720}
+      width={isCompactCanvas ? 854 : 1280}
+      height={isCompactCanvas ? 480 : 720}
       className="w-full h-full object-cover"
     />
   );
-};
+});

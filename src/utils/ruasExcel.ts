@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { RoadConditionPKRMS, RuasJalan, RuasSTASegment, SurfaceType } from '../types';
 import { summarizeRuasFromSTASegments } from './pkrms';
+import { triggerBlobDownload } from './nativeDownload';
 
 export interface ExcelRuasParseResult {
   roads: RuasJalan[];
@@ -217,7 +218,11 @@ export function downloadRuasExcelTemplate() {
   wsGuide['!cols'] = [{ wch: 36 }, { wch: 82 }];
   XLSX.utils.book_append_sheet(wb, wsGuide, 'Petunjuk_Pengisian');
 
-  XLSX.writeFile(wb, 'Template_Ruas_Jalan_Baru_Mentawai.xlsx');
+  const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const excelBlob = new Blob([wbOut], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  triggerBlobDownload(excelBlob, 'Template_Ruas_Jalan_Baru_Mentawai.xlsx');
 }
 
 /**
