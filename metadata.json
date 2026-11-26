@@ -1,0 +1,11 @@
+{
+  "name": "Remix Survey Kondisi Jalan Kab. Kep. Mentawai",
+  "description": "Aplikasi survey kondisi jalan berbasis AI untuk deteksi lubang dan retak otomatis dengan pelaporan berbasis peta Kabupaten Kepulauan Mentawai.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
