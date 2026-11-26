@@ -1,6 +1,7 @@
 import { RuasJalan, SurveyPhoto, SurveyVideo } from '../types';
 import { getHd600DpiPhotoFromStorage } from './photo3r';
 import { downloadSurveyVideo, getStoredVideoEntry } from './videoRecorder';
+import { triggerBlobDownload } from './nativeDownload';
 
 export type DeviceStorageMode = 'internal_only' | 'internal_and_folder' | 'auto_download';
 export type PhotoDeviceQuality = 'hd_600dpi' | 'standard_fhd';
@@ -365,24 +366,7 @@ export async function resolvePhotoBlobForDeviceSave(
 }
 
 export function triggerBlobBrowserDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.rel = 'noopener';
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  setTimeout(() => {
-    if (link.parentNode) {
-      link.parentNode.removeChild(link);
-    }
-    try {
-      URL.revokeObjectURL(url);
-    } catch {
-      // ignore
-    }
-  }, 400);
+  triggerBlobDownload(blob, filename);
 }
 
 export async function persistPhotoToConfiguredDeviceTarget(

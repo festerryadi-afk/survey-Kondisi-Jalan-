@@ -1,5 +1,6 @@
 import { DefectItem, SurveyVideo } from '../types';
 import { drawWatermark, formatSTA } from './geo';
+import { triggerBlobDownload } from './nativeDownload';
 
 export interface StoredVideoEntry {
   blob: Blob;
@@ -1059,18 +1060,7 @@ export async function downloadSurveyVideo(video: {
 
   if (entry) {
     const filename = `DPUPR_MENTAWAI_Video_Ruas${safeRuas}_STA${video.startSta}-${video.endSta}.${entry.extension}`;
-    const link = document.createElement('a');
-    link.href = entry.blobUrl;
-    link.download = filename;
-    link.rel = 'noopener';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-    }, 150);
+    triggerBlobDownload(entry.blob, filename);
     return { filename };
   }
 

@@ -1,0 +1,98 @@
+name: Build Android APK (Survey Kondisi Jalan Kabupaten)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    name: Compile & Sign Survey_Kondisi_Jalan_Mentawai.apk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build production web bundle (Vite)
+        run: npm run build
+
+      - name: Ensure Capacitor Android platform & sync web assets
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Prepare Android release signing keystore
+        run: |
+          KEYSTORE_FILE="${RUNNER_TEMP}/mentawai-release.jks"
+          keytool -genkeypair -noprompt \
+            -keystore "$KEYSTORE_FILE" \
+            -storetype JKS \
+            -alias mentawai_survey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "MentawaiSurvey2026!" \
+            -keypass "MentawaiSurvey2026!" \
+            -dname "CN=DPUPR Mentawai, OU=Bina Marga, O=Pemkab Kepulauan Mentawai, L=Tuapejat, ST=Sumatera Barat, C=ID"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=MentawaiSurvey2026!" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=mentawai_survey" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=MentawaiSurvey2026!" >> "$GITHUB_ENV"
+
+      - name: Build signed Release APK (minSdk 24 / Android 7.0+)
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Rename and verify signed APK
+        run: |
+          APK_SOURCE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_SOURCE" ]; then
+            echo "Release APK not found!"
+            exit 1
+          fi
+          cp "$APK_SOURCE" Survey_Kondisi_Jalan_Mentawai.apk
+          ls -lh Survey_Kondisi_Jalan_Mentawai.apk
+          APKSIGNER=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose Survey_Kondisi_Jalan_Mentawai.apk
+          fi
+
+      - name: Upload Survey_Kondisi_Jalan_Mentawai.apk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Survey_Kondisi_Jalan_Mentawai-APK
+          path: Survey_Kondisi_Jalan_Mentawai.apk
+          retention-days: 90
+
+      - name: Attach APK to GitHub Release (on version tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Survey_Kondisi_Jalan_Mentawai.apk

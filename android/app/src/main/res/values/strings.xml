@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Survey Kondisi Jalan Kabupaten</string>
+    <string name="title_activity_main">Survey Kondisi Jalan Kabupaten</string>
+    <string name="package_name">id.go.mentawaikab.dpupr.surveijalan</string>
+    <string name="custom_url_scheme">id.go.mentawaikab.dpupr.surveijalan</string>
+</resources>
