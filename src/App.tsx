@@ -241,13 +241,26 @@ export default function App() {
     };
   }, []);
 
-  // Save to localStorage safely
+  // Save ruasList to localStorage safely (debounced + idle to prevent stalling active video recording)
   useEffect(() => {
-    try {
-      localStorage.setItem('mentawai_ruas_list_v2', JSON.stringify(ruasList));
-    } catch {
-      // ignore storage quota error
-    }
+    const timer = setTimeout(() => {
+      const persistRuas = () => {
+        try {
+          localStorage.setItem('mentawai_ruas_list_v2', JSON.stringify(ruasList));
+        } catch {
+          // ignore storage quota error
+        }
+      };
+      const winIdle = window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      };
+      if (typeof winIdle.requestIdleCallback === 'function') {
+        winIdle.requestIdleCallback(persistRuas, { timeout: 1500 });
+      } else {
+        persistRuas();
+      }
+    }, 450);
+    return () => clearTimeout(timer);
   }, [ruasList]);
 
   useEffect(() => {
@@ -431,8 +444,8 @@ export default function App() {
       )
     );
 
-    // If online, immediately sync
-    if (isOnline) {
+    // If online and not yet synced, mark synced
+    if (isOnline && newPhoto.syncStatus !== 'synced') {
       setTimeout(() => {
         setPhotos((prev) =>
           prev.map((p) => (p.id === newPhoto.id ? { ...p, syncStatus: 'synced' } : p))

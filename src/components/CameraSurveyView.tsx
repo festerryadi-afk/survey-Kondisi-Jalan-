@@ -195,6 +195,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
   const currentRuasRef = useRef(currentRuas);
   const cameraActiveRef = useRef(false);
   const recorderRef = useRef<RoadSurveyRecorder | null>(null);
+  const isSurveyRunningRef = useRef<boolean>(isSurveyRunning);
   const isRecordingVideoRef = useRef<boolean>(false);
   const isSurveyPausedRef = useRef<boolean>(false);
   const videoStartStaRef = useRef<number>(0);
@@ -279,8 +280,18 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
   }, [isSurveyPaused]);
 
   useEffect(() => {
+    isSurveyRunningRef.current = isSurveyRunning;
     onSurveyFocusModeChange?.(isSurveyRunning);
   }, [isSurveyRunning, onSurveyFocusModeChange]);
+
+  const syncSurveyUiFromRefs = () => {
+    setCurrentSta(Math.round(staRef.current));
+    setDistanceSinceLastCapture(distAccumRef.current);
+    setVehicleSpeedKmh(vehicleSpeedRef.current);
+    setCurrentCoord({ ...currentCoordRef.current });
+    setGpsTrackPoints([...gpsTrackRef.current]);
+    setDetectedDefects([...detectedDefectsRef.current]);
+  };
 
   useEffect(() => {
     if (isRecordingVideo) {
@@ -362,7 +373,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
     const sorted = existing.sort((a, b) => a.staMeters - b.staMeters);
     gpsTrackRef.current = sorted;
-    setGpsTrackPoints(sorted);
+    if (!isSurveyRunningRef.current) {
+      setGpsTrackPoints(sorted);
+    }
     lastTrackedCoordRef.current = {
       lat: entry.lat,
       lng: entry.lng,
@@ -662,19 +675,17 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     staRef.current = totalMeters;
     distAccumRef.current = 0;
     vehicleSpeedRef.current = 0;
-    setCurrentSta(totalMeters);
-    setDistanceSinceLastCapture(0);
-    setVehicleSpeedKmh(0);
-
-    setCurrentCoord((prev) => ({
-      ...prev,
+    currentCoordRef.current = {
+      ...currentCoordRef.current,
       lat: endLat,
       lng: endLng,
-    }));
+    };
 
     isSurveyPausedRef.current = false;
+    isSurveyRunningRef.current = false;
     setIsSurveyPaused(false);
     setIsSurveyRunning(false);
+    syncSurveyUiFromRefs();
 
     if (isRecordingVideoRef.current) {
       void stopAndSaveVideoRecording(totalMeters);
@@ -696,7 +707,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
       const resetSpeedToZero = () => {
         vehicleSpeedRef.current = 0;
-        setVehicleSpeedKmh(0);
+        if (!isSurveyRunningRef.current) {
+          setVehicleSpeedKmh(0);
+        }
       };
 
       const armIdleZeroTimer = () => {
@@ -728,12 +741,15 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               ? pos.coords.speed
               : null;
 
-          setCurrentCoord({
+          currentCoordRef.current = {
             lat: newLat,
             lng: newLng,
             altitude: alt,
             accuracy: acc,
-          });
+          };
+          if (!isSurveyRunningRef.current) {
+            setCurrentCoord(currentCoordRef.current);
+          }
 
           if (!prevGpsFixRef.current) {
             prevGpsFixRef.current = { lat: newLat, lng: newLng, timeMs: nowMs };
@@ -742,7 +758,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
                 ? Math.min(120, Math.round(rawHardwareSpeedMs * 3.6))
                 : 0;
             vehicleSpeedRef.current = initialSpeedKmh;
-            setVehicleSpeedKmh(initialSpeedKmh);
+            if (!isSurveyRunningRef.current) {
+              setVehicleSpeedKmh(initialSpeedKmh);
+            }
             if (staRef.current === 0) {
               recordGpsTrackPoint(activeRoad, {
                 staMeters: 0,
@@ -786,7 +804,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           }
 
           vehicleSpeedRef.current = autoSpeedKmh;
-          setVehicleSpeedKmh(autoSpeedKmh);
+          if (!isSurveyRunningRef.current) {
+            setVehicleSpeedKmh(autoSpeedKmh);
+          }
           armIdleZeroTimer();
 
           const hasConfirmedMove =
@@ -800,8 +820,10 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             const actualMoved = Math.max(0, clampedNextSta - staRef.current);
             staRef.current = clampedNextSta;
             distAccumRef.current += actualMoved;
-            setCurrentSta(Math.round(clampedNextSta));
-            setDistanceSinceLastCapture(distAccumRef.current);
+            if (!isSurveyRunningRef.current) {
+              setCurrentSta(Math.round(clampedNextSta));
+              setDistanceSinceLastCapture(distAccumRef.current);
+            }
 
             // Rekam breadcrumb rute GPS nyata setiap perpindahan >= 8m agar jalur akurat mengikuti belokan jalan
             const lastTrk = lastTrackedCoordRef.current;
@@ -845,7 +867,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               void triggerPhotoCapture(newLat, newLng, targetSta, true);
               lastCaptureCoordRef.current = { lat: newLat, lng: newLng };
               distAccumRef.current = Math.max(0, clampedNextSta - targetSta);
-              setDistanceSinceLastCapture(distAccumRef.current);
+              if (!isSurveyRunningRef.current) {
+                setDistanceSinceLastCapture(distAccumRef.current);
+              }
             }
 
             if (clampedNextSta >= totalRoadMeters) {
@@ -895,6 +919,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
     const intervalTime = batterySaver ? 1500 : 1000;
     let lastTickMs = performance.now();
+    let lastSimUiSpeed = vehicleSpeedRef.current;
 
     const interval = setInterval(() => {
       const nowMs = performance.now();
@@ -971,21 +996,29 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           ? Math.round(rawSpeedKmh * 10) / 10
           : Math.round(rawSpeedKmh);
       vehicleSpeedRef.current = computedAutoSpeed;
-      setVehicleSpeedKmh(computedAutoSpeed);
+      if (
+        !isSurveyRunningRef.current ||
+        (!cameraActiveRef.current && Math.abs(computedAutoSpeed - lastSimUiSpeed) >= 3)
+      ) {
+        lastSimUiSpeed = computedAutoSpeed;
+        setVehicleSpeedKmh(computedAutoSpeed);
+      }
 
       const nextSta = Math.min(totalRoadMeters, staRef.current + metersMoved);
       const actualMoved = Math.max(0, nextSta - staRef.current);
       staRef.current = nextSta;
-      setCurrentSta(Math.round(nextSta));
 
       // Hitung koordinat otomatis berdasarkan koordinat awal & jarak tempuh pada rute ruas jalan di peta
       const [nextLat, nextLng] = interpolateCoordAlongRuas(activeRoad, nextSta);
-
-      setCurrentCoord((prev) => ({
-        ...prev,
+      currentCoordRef.current = {
+        ...currentCoordRef.current,
         lat: nextLat,
         lng: nextLng,
-      }));
+      };
+      if (!isSurveyRunningRef.current) {
+        setCurrentSta(Math.round(nextSta));
+        setCurrentCoord(currentCoordRef.current);
+      }
 
       // Rekam jalur breadcrumb GPS Tracker per ~50m & checkpoint tepat per 100m (independen dari toggle foto)
       const simLastSta = lastTrackedCoordRef.current?.staMeters ?? 0;
@@ -1021,7 +1054,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       }
 
       distAccumRef.current += actualMoved;
-      setDistanceSinceLastCapture(distAccumRef.current);
+      if (!isSurveyRunningRef.current) {
+        setDistanceSinceLastCapture(distAccumRef.current);
+      }
       while (autoCaptureEnabledRef.current && lastAutoCaptureStaRef.current + 100 <= nextSta) {
         const targetSta = lastAutoCaptureStaRef.current + 100;
         lastAutoCaptureStaRef.current = targetSta;
@@ -1029,7 +1064,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         void triggerPhotoCapture(capLat, capLng, targetSta, true);
         lastCaptureCoordRef.current = { lat: capLat, lng: capLng };
         distAccumRef.current = Math.max(0, nextSta - targetSta);
-        setDistanceSinceLastCapture(distAccumRef.current);
+        if (!isSurveyRunningRef.current) {
+          setDistanceSinceLastCapture(distAccumRef.current);
+        }
       }
 
       if (nextSta >= totalRoadMeters) {
@@ -1039,8 +1076,12 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
       // AI defect random simulator on driving road (only when Deteksi AI is active)
       if (!aiDetectionEnabledRef.current) {
-        detectedDefectsRef.current = [];
-        setDetectedDefects([]);
+        if (detectedDefectsRef.current.length > 0) {
+          detectedDefectsRef.current = [];
+          if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+            setDetectedDefects([]);
+          }
+        }
         return;
       }
 
@@ -1055,7 +1096,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 38, y: 55, width: 24, height: 18 },
         };
         detectedDefectsRef.current = [newDefect];
-        setDetectedDefects([newDefect]);
+        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+          setDetectedDefects([newDefect]);
+        }
         playAlertSound(true);
         onTriggerAlert(
           'Deteksi Cacat Kritis: Lubang Berat',
@@ -1073,7 +1116,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 32, y: 50, width: 36, height: 22 },
         };
         detectedDefectsRef.current = [newDefect];
-        setDetectedDefects([newDefect]);
+        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+          setDetectedDefects([newDefect]);
+        }
         playAlertSound(false);
       } else if (dice > 0.45) {
         const newDefect: DefectItem = {
@@ -1085,10 +1130,14 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           boundingBox: { x: 68, y: 58, width: 20, height: 16 },
         };
         detectedDefectsRef.current = [newDefect];
-        setDetectedDefects([newDefect]);
-      } else {
+        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+          setDetectedDefects([newDefect]);
+        }
+      } else if (detectedDefectsRef.current.length > 0) {
         detectedDefectsRef.current = [];
-        setDetectedDefects([]);
+        if (!isSurveyRunningRef.current || !cameraActiveRef.current) {
+          setDetectedDefects([]);
+        }
       }
     }, intervalTime);
 
@@ -1101,10 +1150,23 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     batterySaver
   ]);
 
-  // Video recording timer (berhenti menghitung saat survei di-pause)
+  // Video recording timer (skip state ticks saat survei fullscreen aktif agar tidak memicu re-render per detik)
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    if (isRecordingVideo && !isSurveyPaused) {
+    if (isRecordingVideo && !isSurveyPaused && !isSurveyRunning) {
+      const activePauseNowMs = videoPauseStartedAtMsRef.current
+        ? Math.max(0, Date.now() - videoPauseStartedAtMsRef.current)
+        : 0;
+      const syncedElapsed = videoStartTimeMsRef.current
+        ? Math.max(
+            0,
+            Math.floor(
+              (Date.now() - videoStartTimeMsRef.current - (videoPausedTotalMsRef.current + activePauseNowMs)) /
+                1000
+            )
+          )
+        : 0;
+      setVideoElapsedSec(syncedElapsed);
       timer = setInterval(() => {
         setVideoElapsedSec((s) => s + 1);
       }, 1000);
@@ -1114,7 +1176,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isRecordingVideo, isSurveyPaused]);
+  }, [isRecordingVideo, isSurveyPaused, isSurveyRunning]);
 
   // Real-time Live Frame AI Scan (triggered manually or periodically during active physical camera survey)
   const runLiveAiFrameScan = async (options?: { silent?: boolean }) => {
@@ -1621,18 +1683,22 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       typeof navigator !== 'undefined' &&
       (/Android/i.test(navigator.userAgent) ||
         (typeof window !== 'undefined' && window.innerWidth <= 480));
-    const recDims =
-      activeCamSettings.resolution === '540p' ||
-      (isCompactAndroid && activeCamSettings.resolution !== '1080p')
+    const recDims = isCompactAndroid
+      ? activeCamSettings.resolution === '1080p'
+        ? { width: 960, height: 540 }
+        : { width: 854, height: 480 }
+      : activeCamSettings.resolution === '540p'
         ? getResolutionDimensions('540p')
         : getResolutionDimensions('720p');
-    const recFps = isCompactAndroid
-      ? Math.min(24, activeCamSettings.targetFps)
-      : activeCamSettings.targetFps;
+    const recFps = batterySaver || activeCamSettings.targetFps <= 20 ? 20 : 30;
 
     const activeStorageSettings = loadDeviceStorageSettings();
     const rawBitrate = getVideoBitrateBps(activeStorageSettings.videoBitratePreset);
-    const recBitrate = isCompactAndroid ? Math.min(1_600_000, rawBitrate) : rawBitrate;
+    const recBitrate = isCompactAndroid
+      ? batterySaver
+        ? 1_100_000
+        : Math.min(1_500_000, rawBitrate)
+      : rawBitrate;
 
     const recorder = new RoadSurveyRecorder({
       getSnapshot: () => ({
@@ -1706,6 +1772,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
     hasCompletedRoadRef.current = false;
     isSurveyPausedRef.current = false;
+    isSurveyRunningRef.current = true;
     setIsSurveyPaused(false);
     setIsSurveyRunning(true);
 
@@ -1734,7 +1801,12 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
         category: 'start',
         source: useSimulationDriving ? 'sim' : 'gps',
       });
-      void triggerPhotoCapture(startLat, startLng, 0, true);
+      // Beri jeda 220ms agar MediaRecorder stabil menulis header awal sebelum encoding JPEG STA 00+000
+      setTimeout(() => {
+        if (!hasCompletedRoadRef.current) {
+          void triggerPhotoCapture(startLat, startLng, 0, true);
+        }
+      }, 220);
     }
   };
 
@@ -1747,11 +1819,11 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
     if (nextPaused) {
       vehicleSpeedRef.current = 0;
-      setVehicleSpeedKmh(0);
       if (isRecordingVideoRef.current) {
         videoPauseStartedAtMsRef.current = Date.now();
         recorderRef.current?.pause();
       }
+      syncSurveyUiFromRefs();
     } else {
       if (videoPauseStartedAtMsRef.current > 0) {
         videoPausedTotalMsRef.current += Math.max(0, Date.now() - videoPauseStartedAtMsRef.current);
@@ -1765,12 +1837,12 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
 
   const handleStopAutoSurvey = () => {
     isSurveyPausedRef.current = false;
+    isSurveyRunningRef.current = false;
     setIsSurveyPaused(false);
     setIsSurveyRunning(false);
     vehicleSpeedRef.current = 0;
-    setVehicleSpeedKmh(0);
     distAccumRef.current = 0;
-    setDistanceSinceLastCapture(0);
+    syncSurveyUiFromRefs();
 
     if (!currentRuas) {
       if (isRecordingVideoRef.current) {
@@ -2415,6 +2487,7 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
               isMoving={isSurveyRunning && !isSurveyPaused} 
               speed={vehicleSpeedKmh} 
               batterySaver={batterySaver}
+              isRecordingVideo={isRecordingVideo}
             />
           </div>
         )}
@@ -2744,15 +2817,16 @@ const SimulatedRoadCanvas: React.FC<{
   isMoving: boolean;
   speed: number;
   batterySaver: boolean;
-}> = React.memo(({ defects, isMoving, speed, batterySaver }) => {
+  isRecordingVideo: boolean;
+}> = React.memo(({ defects, isMoving, speed, batterySaver, isRecordingVideo }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef<number>(0);
-  const latestPropsRef = useRef({ defects, isMoving, speed, batterySaver });
+  const latestPropsRef = useRef({ defects, isMoving, speed, batterySaver, isRecordingVideo });
   const isCompactCanvas = typeof window !== 'undefined' && window.innerWidth <= 480;
 
   useEffect(() => {
-    latestPropsRef.current = { defects, isMoving, speed, batterySaver };
-  }, [defects, isMoving, speed, batterySaver]);
+    latestPropsRef.current = { defects, isMoving, speed, batterySaver, isRecordingVideo };
+  }, [defects, isMoving, speed, batterySaver, isRecordingVideo]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2765,19 +2839,25 @@ const SimulatedRoadCanvas: React.FC<{
 
     let animId = 0;
     let lastMs = 0;
-    let lastBatteryRenderMs = 0;
+    let lastThrottledRenderMs = 0;
     let active = true;
 
     const render = (nowMs: number) => {
       if (!active) return;
-      const { defects: curDefects, isMoving: curMoving, speed: curSpeed, batterySaver: curBattery } =
-        latestPropsRef.current;
+      const {
+        defects: curDefects,
+        isMoving: curMoving,
+        speed: curSpeed,
+        batterySaver: curBattery,
+        isRecordingVideo: curRecording,
+      } = latestPropsRef.current;
 
-      if (curBattery && lastBatteryRenderMs > 0 && nowMs - lastBatteryRenderMs < 66) {
+      const minGapMs = curBattery ? 66 : curRecording ? 45 : 0;
+      if (minGapMs > 0 && lastThrottledRenderMs > 0 && nowMs - lastThrottledRenderMs < minGapMs) {
         animId = requestAnimationFrame(render);
         return;
       }
-      lastBatteryRenderMs = nowMs;
+      lastThrottledRenderMs = nowMs;
 
       const dtSec = lastMs > 0 ? Math.min(0.1, Math.max(0.001, (nowMs - lastMs) / 1000)) : 1 / 60;
       lastMs = nowMs;

@@ -304,7 +304,8 @@ export function drawWatermark(
     staText: string;
     lat: number;
     lng: number;
-  }
+  },
+  options?: { fastNoBlur?: boolean }
 ) {
   const baseFontSize = Math.max(14, Math.round(width * 0.022));
   const paddingX = Math.max(16, Math.round(width * 0.025));
@@ -315,12 +316,14 @@ export function drawWatermark(
   ctx.textBaseline = 'bottom';
 
   // High contrast drop shadow & stroke so text is razor-sharp on any surface without a background frame
-  ctx.shadowColor = '#000000';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 2;
+  if (!options?.fastNoBlur) {
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+  }
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = options?.fastNoBlur ? 4 : 3.5;
   ctx.fillStyle = '#FFFFFF';
 
   // Line 2 (bottom): Koordinat & STA
