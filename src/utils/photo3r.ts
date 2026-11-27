@@ -516,7 +516,8 @@ export async function printSinglePhoto3R(photo: {
 
 /**
  * Mengekspor laporan dokumentasi dikelompokkan per ruas jalan ke file *.PDF
- * dengan ukuran cetak foto fisik presisi 3R (12,7 x 8,9 cm) beresolusi HD 600 DPI.
+ * dengan layout A4 Portrait, maksimal 3 foto tersusun ke bawah per halaman
+ * diurutkan dari STA terkecil ke STA terbesar (rasio cetak 3R 12,7 x 8,9 cm HD 600 DPI).
  */
 export async function exportGroupedReportPDF(
   ruasList: RuasJalan[],
@@ -548,219 +549,274 @@ export async function exportGroupedReportPDF(
   const logoDataUrl = await loadMentawaiLogoDataUrl();
   const { jsPDF } = await import('jspdf');
 
-  // A4 Landscape: 297 x 210 mm -> muat 2 foto 3R (127 x 89 mm) per baris secara presisi 1:1
+  // A4 Portrait: 210 x 297 mm -> tepat 3 kartu foto tersusun ke bawah per halaman
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
     compress: true,
   });
 
-  const pageWidth = 297;
-  const pageHeight = 210;
-  const marginX = 14;
-  const cardWidth = 127; // 12,7 cm (3R)
-  const photoHeight = 89; // 8,9 cm (3R)
-  const infoHeight = 12.5;
-  const cardTotalHeight = photoHeight + infoHeight; // 101.5 mm
-  const colGap = 15; // 14 + 127 + 15 + 127 + 14 = 297 mm
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 12;
+  const contentWidth = pageWidth - marginX * 2; // 186 mm
+  const cardWidth = contentWidth;
+  const cardHeight = 72; // 3 kartu x 72 mm + 2 jarak (4 mm) = 224 mm -> pas untuk halaman 1 & selanjutnya
+  const cardGap = 4;
+  const photoInnerPad = 2.5;
+  const photoHeight = cardHeight - photoInnerPad * 2; // 67 mm
+  const photoWidth = Number((photoHeight * (PHOTO_3R_WIDTH_CM / PHOTO_3R_HEIGHT_CM)).toFixed(2)); // ~95.6 mm (persis rasio 3R 12,7:8,9)
+  const footerLimitY = pageHeight - 13; // 284 mm
 
-  let y = 14;
+  let y = 12.5;
+  let pageNum = 1;
+  let cardsOnPage = 0;
 
-  const drawFooter = (pageNum: number) => {
+  const drawFooter = (num: number) => {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
     doc.line(marginX, pageHeight - 10, pageWidth - marginX, pageHeight - 10);
     doc.text(
       'Survey Kondisi Jalan Kabupaten | Pemerintah Kabupaten Kepulauan Mentawai - Dinas PUPR',
       marginX,
       pageHeight - 6
     );
-    doc.text(`Halaman ${pageNum}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
+    doc.text(`Halaman ${num}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
+  };
+
+  const startNewPage = () => {
+    doc.addPage();
+    pageNum += 1;
+    y = 13;
+    cardsOnPage = 0;
+    drawFooter(pageNum);
+  };
+
+  const ensureSpace = (neededHeight: number) => {
+    if (y + neededHeight > footerLimitY) {
+      startNewPage();
+    }
+  };
+
+  const getConditionBadgeRgb = (
+    condition: string
+  ): { bg: [number, number, number]; text: [number, number, number] } => {
+    switch (condition) {
+      case 'Baik':
+        return { bg: [209, 250, 229], text: [6, 95, 70] };
+      case 'Sedang':
+        return { bg: [254, 243, 199], text: [146, 64, 14] };
+      case 'Rusak Ringan':
+        return { bg: [255, 237, 213], text: [154, 52, 18] };
+      case 'Rusak Berat':
+        return { bg: [255, 228, 230], text: [159, 18, 57] };
+      default:
+        return { bg: [226, 232, 240], text: [51, 65, 85] };
+    }
   };
 
   // Kop Laporan Halaman 1 (Logo Pemerintah Kabupaten Kepulauan Mentawai di kiri atas)
   if (logoDataUrl) {
     try {
       const logoFormat = logoDataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-      // Rasio asli logo 279 x 320 -> 14 mm x 16 mm
-      doc.addImage(logoDataUrl, logoFormat, marginX, 9.5, 14, 16, 'mentawai-logo', 'NONE');
+      // Rasio asli logo 279 x 320 -> 13 mm x 15 mm
+      doc.addImage(logoDataUrl, logoFormat, marginX, 8, 13, 15, 'mentawai-logo', 'NONE');
     } catch {
       // Abaikan jika logo gagal disisipkan
     }
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(12.5);
   doc.setTextColor(15, 23, 42);
-  doc.text('PEMERINTAH KABUPATEN KEPULAUAN MENTAWAI', pageWidth / 2, y, { align: 'center' });
-  y += 5.5;
+  doc.text('PEMERINTAH KABUPATEN KEPULAUAN MENTAWAI', pageWidth / 2 + 4, y, { align: 'center' });
+  y += 5;
 
-  doc.setFontSize(11.5);
+  doc.setFontSize(10.5);
   doc.setTextColor(180, 83, 9);
-  doc.text('DINAS PEKERJAAN UMUM DAN PENATAAN RUANG', pageWidth / 2, y, { align: 'center' });
-  y += 4.8;
+  doc.text('DINAS PEKERJAAN UMUM DAN PENATAAN RUANG', pageWidth / 2 + 4, y, { align: 'center' });
+  y += 4.2;
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text('Laporan Dokumentasi Survey Kondisi Jalan', pageWidth / 2, y, { align: 'center' });
-  y += 3.5;
+  doc.text('Laporan Dokumentasi Survey Kondisi Jalan', pageWidth / 2 + 4, y, { align: 'center' });
+  y += 3;
 
   doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.6);
+  doc.setLineWidth(0.55);
   doc.line(marginX, y, pageWidth - marginX, y);
   y += 4;
 
-  // Box Ringkasan Laporan
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(marginX, y, pageWidth - marginX * 2, 10, 1.5, 1.5, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(30, 41, 59);
-  const dateLabel = new Date().toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-  doc.text(`Tanggal Pelaporan: ${dateLabel}`, marginX + 4, y + 6.2);
-  doc.text(
-    `Total Ruas: ${targetRuasList.length} Ruas  |  Total Foto: ${targetPhotos.length} Titik`,
-    pageWidth - marginX - 4,
-    y + 6.2,
-    { align: 'right' }
-  );
-  y += 14;
-
-  let pageNum = 1;
   drawFooter(pageNum);
 
-  const ensureSpace = (neededHeight: number) => {
-    if (y + neededHeight > pageHeight - 14) {
-      doc.addPage();
-      pageNum += 1;
-      y = 14;
-      drawFooter(pageNum);
+  const drawRuasHeader = (ruas: RuasJalan, isContinuation: boolean) => {
+    doc.setFillColor(30, 58, 138);
+    doc.roundedRect(marginX, y, contentWidth, 7.5, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(255, 255, 255);
+    const titlePrefix = isContinuation ? 'Lanjutan ' : '';
+    doc.text(
+      toPdfSafeText(`${titlePrefix}Ruas ${ruas.nomorRuas || '-'}: ${ruas.namaRuas || '-'}`),
+      marginX + 3,
+      y + 5.1
+    );
+    y += 10;
+
+    if (!isContinuation) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.6);
+      doc.setTextColor(51, 65, 85);
+      const staSegments = getRuasSTASegments(ruas);
+      const staSummaryText =
+        staSegments.length > 0
+          ? staSegments
+              .map(
+                (s) =>
+                  `${formatMeterToSTA(s.startSta)}-${formatMeterToSTA(s.endSta)}: ${s.tipePermukaan} (${s.kondisiJalan})`
+              )
+              .join('  |  ')
+          : 'Segmen per STA belum diatur';
+      const wrappedStaLines = (doc.splitTextToSize(
+        toPdfSafeText(`Permukaan & Kondisi per STA: ${staSummaryText}`),
+        contentWidth
+      ) as string[]).slice(0, 2);
+      doc.text(wrappedStaLines, marginX, y);
+      y += Math.max(4, wrappedStaLines.length * 3.4 + 1);
     }
   };
 
   for (const ruas of targetRuasList) {
+    // Urutkan foto dari STA terkecil ke STA terbesar
     const ruasPhotos = targetPhotos
       .filter((p) => p.ruasId === ruas.id)
       .sort(comparePhotosByStaAsc);
     if (ruasPhotos.length === 0) continue;
 
-    // Pastikan judul ruas + minimal 1 baris foto muat di halaman yang sama
-    ensureSpace(16 + cardTotalHeight);
-
-    // Header Ruas
-    doc.setFillColor(30, 58, 138);
-    doc.roundedRect(marginX, y, pageWidth - marginX * 2, 8.5, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text(
-      toPdfSafeText(`Ruas ${ruas.nomorRuas || '-'}: ${ruas.namaRuas || '-'}`),
-      marginX + 3,
-      y + 5.7
-    );
-    y += 11.5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.2);
-    doc.setTextColor(51, 65, 85);
-    const staSegments = getRuasSTASegments(ruas);
-    const staSummaryText =
-      staSegments.length > 0
-        ? staSegments
-            .map(
-              (s) =>
-                `${formatMeterToSTA(s.startSta)}-${formatMeterToSTA(s.endSta)}: ${s.tipePermukaan} (${s.kondisiJalan})`
-            )
-            .join('  |  ')
-        : 'Segmen per STA belum diatur';
-    const wrappedStaLines = doc.splitTextToSize(
-      toPdfSafeText(`Permukaan & Kondisi per STA: ${staSummaryText}`),
-      pageWidth - marginX * 2
-    ) as string[];
-    doc.text(wrappedStaLines, marginX, y);
-    y += Math.max(4, wrappedStaLines.length * 3.8 + 1);
-
-    // Render foto berpasangan (2 kolom x 127 mm = 2 x 3R per baris)
-    for (let i = 0; i < ruasPhotos.length; i += 2) {
-      ensureSpace(cardTotalHeight + 4);
-
-      const pair = [ruasPhotos[i], ruasPhotos[i + 1]].filter(Boolean) as SurveyPhoto[];
-      pair.forEach((p, idx) => {
-        const cardX = marginX + idx * (cardWidth + colGap);
-
-        // Bingkai kartu foto 3R
-        doc.setFillColor(255, 255, 255);
-        doc.setDrawColor(148, 163, 184);
-        doc.setLineWidth(0.35);
-        doc.rect(cardX, y, cardWidth, cardTotalHeight, 'FD');
-
-        // Gambar foto 3R tepat 127 x 89 mm (12,7 x 8,9 cm)
-        const imgData = hdMap.get(p.id) || p.imageUrl;
-        try {
-          if (
-            imgData &&
-            (imgData.startsWith('data:image/jpeg') ||
-              imgData.startsWith('data:image/jpg') ||
-              imgData.startsWith('data:image/png'))
-          ) {
-            const imgFormat = imgData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(imgData, imgFormat, cardX, y, cardWidth, photoHeight, p.id, 'NONE');
-          } else {
-            doc.setFillColor(30, 41, 59);
-            doc.rect(cardX, y, cardWidth, photoHeight, 'F');
-          }
-        } catch {
-          doc.setFillColor(30, 41, 59);
-          doc.rect(cardX, y, cardWidth, photoHeight, 'F');
-        }
-
-        // Garis pemisah info
-        doc.setDrawColor(203, 213, 225);
-        doc.line(cardX, y + photoHeight, cardX + cardWidth, y + photoHeight);
-
-        // Metadata di bawah foto 3R
-        const textX = cardX + 2.5;
-        let textY = y + photoHeight + 4.5;
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(15, 23, 42);
-        const ts = p.timestamp ? new Date(p.timestamp) : new Date();
-        const waktu = Number.isNaN(ts.getTime()) ? '-' : ts.toLocaleString('id-ID');
-        doc.text(toPdfSafeText(`${p.staText || 'STA -'}  |  ${waktu} WIB`), textX, textY);
-
-        textY += 4.5;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.6);
-        doc.setTextColor(51, 65, 85);
-        const latVal = Number(p.coordinates?.lat ?? 0);
-        const lngVal = Number(p.coordinates?.lng ?? 0);
-        doc.text(
-          toPdfSafeText(
-            `GPS: ${latVal.toFixed(6)}, ${lngVal.toFixed(6)}  |  Kondisi: ${p.pkrmsCondition || '-'}`
-          ),
-          textX,
-          textY
-        );
-      });
-
-      y += cardTotalHeight + 5;
+    // Pastikan judul ruas + minimal 1 kartu foto muat di halaman yang sama dan halaman belum penuh 3 foto
+    if (cardsOnPage >= 3 || y + 15 + cardHeight > footerLimitY) {
+      startNewPage();
     }
 
-    y += 4;
+    drawRuasHeader(ruas, false);
+
+    // Susun foto 1 kolom ke bawah, maksimal 3 buah per halaman
+    for (let idx = 0; idx < ruasPhotos.length; idx++) {
+      const p = ruasPhotos[idx];
+
+      if (cardsOnPage >= 3 || y + cardHeight > footerLimitY) {
+        startNewPage();
+        drawRuasHeader(ruas, true);
+      }
+
+      // Bingkai kartu foto Portrait full-width
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.35);
+      doc.roundedRect(marginX, y, cardWidth, cardHeight, 1.2, 1.2, 'FD');
+
+      const photoX = marginX + photoInnerPad;
+      const photoY = y + photoInnerPad;
+
+      // Gambar foto tepat rasio 3R (12,7 : 8,9)
+      const imgData = hdMap.get(p.id) || p.imageUrl;
+      try {
+        if (
+          imgData &&
+          (imgData.startsWith('data:image/jpeg') ||
+            imgData.startsWith('data:image/jpg') ||
+            imgData.startsWith('data:image/png'))
+        ) {
+          const imgFormat = imgData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+          doc.addImage(imgData, imgFormat, photoX, photoY, photoWidth, photoHeight, p.id, 'NONE');
+        } else {
+          doc.setFillColor(30, 41, 59);
+          doc.rect(photoX, photoY, photoWidth, photoHeight, 'F');
+        }
+      } catch {
+        doc.setFillColor(30, 41, 59);
+        doc.rect(photoX, photoY, photoWidth, photoHeight, 'F');
+      }
+
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.25);
+      doc.rect(photoX, photoY, photoWidth, photoHeight, 'S');
+
+      // Panel detail metadata di sebelah kanan foto
+      const metaX = photoX + photoWidth + 4;
+      const metaWidth = marginX + cardWidth - metaX - 3;
+      let metaY = y + 6;
+
+      // Nomor urut + STA + Badge Kondisi
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(toPdfSafeText(`${idx + 1}. ${p.staText || 'STA -'}`), metaX, metaY);
+
+      const condLabel = toPdfSafeText(p.pkrmsCondition || 'Baik');
+      const badgeStyle = getConditionBadgeRgb(p.pkrmsCondition || '');
+      doc.setFontSize(7.5);
+      const badgeW = Math.min(34, Math.max(18, doc.getTextWidth(condLabel) + 6));
+      const badgeX = marginX + cardWidth - 3 - badgeW;
+      doc.setFillColor(badgeStyle.bg[0], badgeStyle.bg[1], badgeStyle.bg[2]);
+      doc.roundedRect(badgeX, metaY - 4.1, badgeW, 5.4, 1.2, 1.2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(badgeStyle.text[0], badgeStyle.text[1], badgeStyle.text[2]);
+      doc.text(condLabel, badgeX + badgeW / 2, metaY - 0.5, { align: 'center' });
+
+      metaY += 2.2;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(metaX, metaY, marginX + cardWidth - 3, metaY);
+      metaY += 4.2;
+
+      const drawMetaRow = (label: string, value: string, maxLines = 1) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.3);
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, metaX, metaY);
+        metaY += 3.2;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.8);
+        doc.setTextColor(30, 41, 59);
+        const lines = (doc.splitTextToSize(toPdfSafeText(value), metaWidth) as string[]).slice(
+          0,
+          maxLines
+        );
+        doc.text(lines, metaX, metaY);
+        metaY += lines.length * 3.4 + 1.4;
+      };
+
+      const ts = p.timestamp ? new Date(p.timestamp) : new Date();
+      const waktu = Number.isNaN(ts.getTime()) ? '-' : ts.toLocaleString('id-ID');
+      const latVal = Number(p.coordinates?.lat ?? 0);
+      const lngVal = Number(p.coordinates?.lng ?? 0);
+      const defectSummary =
+        p.defects && p.defects.length > 0
+          ? p.defects.map((d) => `${d.type} (${d.severity})`).join(', ')
+          : 'Nihil (Permukaan Mantap)';
+
+      drawMetaRow('Ruas Jalan', `${p.nomorRuas || ruas.nomorRuas} - ${p.ruasNama || ruas.namaRuas}`, 1);
+      drawMetaRow('Waktu Pengambilan', `${waktu} WIB`, 1);
+      drawMetaRow('Koordinat GPS', `${latVal.toFixed(6)}, ${lngVal.toFixed(6)}`, 1);
+      drawMetaRow('Jenis Perkerasan', p.surfaceType || '-', 1);
+      drawMetaRow('Temuan Kerusakan', defectSummary, 2);
+      drawMetaRow('Rekomendasi', p.recommendation || '-', 1);
+
+      y += cardHeight + cardGap;
+      cardsOnPage += 1;
+    }
+
+    y += 3;
   }
 
   if (targetPhotos.length === 0) {
+    ensureSpace(20);
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
@@ -772,5 +828,5 @@ export async function exportGroupedReportPDF(
     );
   }
 
-  savePdfDocument(doc, `Laporan_Dokumentasi_3R_600DPI_Mentawai_${Date.now()}.pdf`);
+  savePdfDocument(doc, `Laporan_Dokumentasi_Portrait_600DPI_Mentawai_${Date.now()}.pdf`);
 }

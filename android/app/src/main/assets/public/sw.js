@@ -87,7 +87,7 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "revision": "fc53d37e606573b811d9d132c9fb1b92"
   }, {
     "url": "index.html",
-    "revision": "812a8131d64f84103a17ac59fa01aa9e"
+    "revision": "1863bde2f05d9a88128d6163ee70601a"
   }, {
     "url": "icon.svg",
     "revision": "b9460ebbb18f0aaa7c78883cab96d8bb"
@@ -107,19 +107,19 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "url": "assets/photoEncodeWorker-CgLhurF4.js",
     "revision": null
   }, {
-    "url": "assets/jspdf.es.min-e9Qz0AFa.js",
+    "url": "assets/jspdf.es.min-Bsb_kej4.js",
     "revision": null
   }, {
-    "url": "assets/index.es-nJ0HwSfr.js",
+    "url": "assets/index.es-LHdkQZj3.js",
     "revision": null
   }, {
     "url": "assets/index-zQZmJNSa.css",
     "revision": null
   }, {
-    "url": "assets/index-BQVEHHmH.js",
+    "url": "assets/index-CCVsSkXh.js",
     "revision": null
   }, {
-    "url": "assets/html2canvas-bp5ttLB4.js",
+    "url": "assets/html2canvas-lvXRMrt4.js",
     "revision": null
   }, {
     "url": "assets/aistudio/image_f57fd2d7.png",
@@ -134,7 +134,16 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "url": "assets/aistudio/image_90a963ef.png",
     "revision": null
   }, {
+    "url": "assets/aistudio/image_7f3b3f3c.png",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/image_753bbbd1.png",
+    "revision": null
+  }, {
     "url": "assets/aistudio/image_70e4eae5.png",
+    "revision": null
+  }, {
+    "url": "assets/aistudio/image_4daead71.png",
     "revision": null
   }, {
     "url": "assets/aistudio/Screenshot_20261126_232940_4ecb9c93.jpg",

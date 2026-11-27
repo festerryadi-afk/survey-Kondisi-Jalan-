@@ -78,7 +78,7 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
       await exportGroupedReportPDF(ruasList, photos, selectedRuasFilter);
       setPdfFeedback({
         type: 'success',
-        message: 'Laporan *.PDF (ukuran cetak 3R 8,9 × 12,7 cm, HD 600 DPI) berhasil diunduh.',
+        message: 'Laporan *.PDF Portrait (3 foto per halaman urut STA kecil ke besar, HD 600 DPI) berhasil diunduh.',
       });
       setTimeout(() => setPdfFeedback(null), 5000);
     } catch (err) {
@@ -247,10 +247,10 @@ export const PhotoDocumentationView: React.FC<PhotoDocumentationViewProps> = ({
               onClick={handleExportPDF}
               disabled={isExportingPdf}
               className="flex items-center justify-center gap-1.5 px-2.5 py-2 sm:px-3.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-200 font-semibold text-[11px] sm:text-xs whitespace-nowrap shadow-md transition disabled:opacity-60 cursor-pointer"
-              title="Unduh Laporan Foto Dokumentasi *.PDF ukuran cetak 3R (8,9 × 12,7 cm) HD 600 DPI"
+              title="Unduh Laporan Foto Dokumentasi *.PDF Portrait (3 foto per halaman urut STA, HD 600 DPI)"
             >
               <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 shrink-0" />
-              <span className="truncate">{isExportingPdf ? 'Membuat *.PDF...' : 'Ekspor *.PDF (3R)'}</span>
+              <span className="truncate">{isExportingPdf ? 'Membuat *.PDF...' : 'Ekspor *.PDF (Portrait)'}</span>
             </button>
 
             <button
