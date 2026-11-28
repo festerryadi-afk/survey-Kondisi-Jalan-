@@ -1467,6 +1467,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             bitmap: frameBitmap,
             watermark: watermarkMeta,
             compactMode: isVideoRecordingNow,
+            enhanceLighting: androidCameraSettingsRef.current.enhanceLighting,
+            enhanceSharpness: androidCameraSettingsRef.current.enhanceSharpness,
           });
           if (!workerResult) {
             // Re-grab or draw simulated if bitmap was transferred/neutered
@@ -1498,6 +1500,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             bitmap: capturedFrame.source,
             watermark: watermarkMeta,
             compactMode: false,
+            enhanceLighting: androidCameraSettingsRef.current.enhanceLighting,
+            enhanceSharpness: androidCameraSettingsRef.current.enhanceSharpness,
           });
           if (!workerResult) {
             capturedFrame.cleanup();
@@ -1518,6 +1522,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
             drawFallbackSim: (ctx, w, h) => drawSimulatedRoadFrame(ctx, w, h, activeDefects),
             watermark: watermarkMeta,
             compactFallback: isVideoRecordingNow,
+            enhanceLighting: androidCameraSettingsRef.current.enhanceLighting,
+            enhanceSharpness: androidCameraSettingsRef.current.enhanceSharpness,
           });
           hd600DpiDataUrl = fallbackEncoded.hd600DpiDataUrl;
           dataUrl = fallbackEncoded.storageDataUrl;
@@ -1803,9 +1809,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       (/Android/i.test(navigator.userAgent) ||
         (typeof window !== 'undefined' && window.innerWidth <= 480));
     const recDims = isCompactAndroid
-      ? activeCamSettings.resolution === '1080p'
-        ? { width: 854, height: 480 }
-        : { width: 640, height: 360 }
+      ? batterySaver || activeCamSettings.resolution === '540p'
+        ? { width: 960, height: 540 }
+        : { width: 1280, height: 720 }
       : activeCamSettings.resolution === '540p'
         ? getResolutionDimensions('540p')
         : getResolutionDimensions('720p');
@@ -1815,8 +1821,8 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
     const rawBitrate = getVideoBitrateBps(activeStorageSettings.videoBitratePreset);
     const recBitrate = isCompactAndroid
       ? batterySaver
-        ? 900_000
-        : Math.min(1_200_000, rawBitrate)
+        ? 1_400_000
+        : Math.min(2_500_000, Math.max(1_800_000, rawBitrate))
       : rawBitrate;
 
     const recorder = new RoadSurveyRecorder({
@@ -1832,6 +1838,10 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
       getVideoEl: () => videoRef.current,
       isCameraActive: () => cameraActiveRef.current,
       getStabilizeCrop: () => androidCameraSettingsRef.current.eisCropMargin,
+      getEnhanceVideo: () => ({
+        lighting: androidCameraSettingsRef.current.enhanceLighting,
+        sharpness: androidCameraSettingsRef.current.enhanceSharpness,
+      }),
       width: recDims.width,
       height: recDims.height,
       targetFps: recFps,
@@ -2573,7 +2583,9 @@ export const CameraSurveyView: React.FC<CameraSurveyViewProps> = ({
           muted
           className={`w-full h-full object-cover transition-transform duration-200 ${
             cameraActive ? 'block' : 'hidden'
-          } ${cameraActive && androidCameraSettings.eisCropMargin ? 'scale-[1.06]' : ''}`}
+          } ${cameraActive && androidCameraSettings.eisCropMargin ? 'scale-[1.04]' : ''} ${
+            cameraActive && androidCameraSettings.enhanceLighting ? 'brightness-[1.05]' : ''
+          } ${cameraActive && androidCameraSettings.enhanceSharpness ? 'contrast-[1.06]' : ''}`}
         />
 
         {/* Fallback Simulation Canvas when physical camera is inactive */}

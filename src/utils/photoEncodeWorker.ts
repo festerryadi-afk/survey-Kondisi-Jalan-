@@ -10,6 +10,8 @@ export interface PhotoEncodeWorkerRequest {
   storageWidth: number;
   storageHeight: number;
   compactMode?: boolean;
+  enhanceLighting?: boolean;
+  enhanceSharpness?: boolean;
   watermark: {
     nomorRuas: string;
     namaRuas: string;
@@ -88,11 +90,106 @@ async function blobToDpi600DataUrl(blob: Blob, dpi = 600): Promise<string> {
   });
 }
 
+function computeAdaptiveLightingFilter(
+  bitmap: ImageBitmap,
+  enhanceLighting: boolean,
+  enhanceSharpness: boolean
+): string {
+  if (!enhanceLighting && !enhanceSharpness) return 'none';
+  let brightness = enhanceLighting ? 1.06 : 1.0;
+  let contrast = enhanceSharpness ? 1.08 : 1.02;
+  const saturate = enhanceLighting ? 1.05 : 1.0;
+
+  if (enhanceLighting) {
+    let sampleCanvas: OffscreenCanvas | null = null;
+    try {
+      const sw = 96;
+      const sh = 68;
+      sampleCanvas = new OffscreenCanvas(sw, sh);
+      const sCtx = sampleCanvas.getContext('2d');
+      if (sCtx) {
+        sCtx.drawImage(bitmap, 0, 0, sw, sh);
+        const data = sCtx.getImageData(0, Math.floor(sh * 0.35), sw, Math.ceil(sh * 0.65)).data;
+        let lumaSum = 0;
+        let brightPixels = 0;
+        const pxCount = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+          const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          lumaSum += luma;
+          if (luma > 235) brightPixels++;
+        }
+        const avgLuma = pxCount > 0 ? lumaSum / pxCount : 115;
+        const brightRatio = pxCount > 0 ? brightPixels / pxCount : 0;
+
+        if (avgLuma < 75 && brightRatio < 0.25) {
+          brightness = 1.18;
+          contrast = enhanceSharpness ? 1.1 : 1.05;
+        } else if (avgLuma < 105 && brightRatio < 0.3) {
+          brightness = 1.11;
+          contrast = enhanceSharpness ? 1.09 : 1.04;
+        } else if (avgLuma > 175 || brightRatio > 0.35) {
+          brightness = 1.0;
+          contrast = enhanceSharpness ? 1.07 : 1.02;
+        }
+      }
+    } catch {
+      // Gunakan default brightness/contrast aman bila sampling gagal
+    } finally {
+      if (sampleCanvas) {
+        sampleCanvas.width = 0;
+        sampleCanvas.height = 0;
+      }
+    }
+  }
+
+  return `brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)}) saturate(${saturate.toFixed(2)})`;
+}
+
+function applyCrispUnsharpPass(
+  ctx: OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  strength = 0.22
+) {
+  if (width > 2050 || height > 1450 || width < 16 || height < 16) return;
+  try {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const dst = imgData.data;
+    const src = new Uint8ClampedArray(dst);
+    const rowStride = width * 4;
+
+    for (let y = 1; y < height - 1; y++) {
+      const rowOffset = y * rowStride;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = rowOffset + x * 4;
+        for (let c = 0; c < 3; c++) {
+          const cur = src[idx + c];
+          const lap =
+            4 * cur -
+            src[idx - rowStride + c] -
+            src[idx + rowStride + c] -
+            src[idx - 4 + c] -
+            src[idx + 4 + c];
+          // Noise gate agar area langit mulus tidak berbintik
+          if (lap > 6 || lap < -6) {
+            const val = cur + lap * strength;
+            dst[idx + c] = val < 0 ? 0 : val > 255 ? 255 : val;
+          }
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {
+    // Abaikan bila memori perangkat terbatas
+  }
+}
+
 function drawBitmapCover(
   ctx: OffscreenCanvasRenderingContext2D,
   bitmap: ImageBitmap,
   targetWidth: number,
-  targetHeight: number
+  targetHeight: number,
+  filterCss = 'none'
 ) {
   const srcWidth = bitmap.width || 1280;
   const srcHeight = bitmap.height || 720;
@@ -118,7 +215,13 @@ function drawBitmapCover(
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+  if ('filter' in ctx && filterCss !== 'none') {
+    ctx.filter = filterCss;
+    ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+    ctx.filter = 'none';
+  } else {
+    ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+  }
 }
 
 function drawSimulatedRoadOnOffscreen(
@@ -237,7 +340,20 @@ function drawWatermarkOffscreen(
 
 self.onmessage = async (event: MessageEvent<PhotoEncodeWorkerRequest>) => {
   const req = event.data;
-  const { id, bitmap, useSimulation, defects, hdWidth, hdHeight, storageWidth, storageHeight, compactMode, watermark } = req;
+  const {
+    id,
+    bitmap,
+    useSimulation,
+    defects,
+    hdWidth,
+    hdHeight,
+    storageWidth,
+    storageHeight,
+    compactMode,
+    enhanceLighting = true,
+    enhanceSharpness = true,
+    watermark,
+  } = req;
 
   let hdCanvas: OffscreenCanvas | null = null;
   let storageCanvas: OffscreenCanvas | null = null;
@@ -249,28 +365,54 @@ self.onmessage = async (event: MessageEvent<PhotoEncodeWorkerRequest>) => {
       throw new Error('OffscreenCanvas 2D tidak tersedia');
     }
 
+    const isRealPhoto = Boolean(bitmap && !useSimulation);
+
     if (bitmap && !useSimulation) {
-      drawBitmapCover(hdCtx, bitmap, hdWidth, hdHeight);
+      const filterCss = computeAdaptiveLightingFilter(bitmap, enhanceLighting, enhanceSharpness);
+      drawBitmapCover(hdCtx, bitmap, hdWidth, hdHeight, filterCss);
+      if (enhanceSharpness) {
+        applyCrispUnsharpPass(hdCtx, hdWidth, hdHeight, 0.22);
+      }
       bitmap.close();
     } else {
       drawSimulatedRoadOnOffscreen(hdCtx, hdWidth, hdHeight, defects || []);
     }
 
-    drawWatermarkOffscreen(hdCtx, hdWidth, hdHeight, watermark, Boolean(compactMode));
-
-    const hdBlob = await hdCanvas.convertToBlob({ type: 'image/jpeg', quality: compactMode ? 0.88 : 0.95 });
-    const hd600DpiDataUrl = await blobToDpi600DataUrl(hdBlob, 600);
-
-    let storageDataUrl = hd600DpiDataUrl;
-    if (!compactMode) {
+    if (!compactMode && isRealPhoto) {
+      // Siapkan versi storage (1920x1345) yang ditajamkan SEBELUM watermark ditimpa
       storageCanvas = new OffscreenCanvas(storageWidth, storageHeight);
       const storageCtx = storageCanvas.getContext('2d', { alpha: false });
       if (storageCtx) {
         storageCtx.imageSmoothingEnabled = true;
         storageCtx.imageSmoothingQuality = 'high';
         storageCtx.drawImage(hdCanvas, 0, 0, storageWidth, storageHeight);
-        const storageBlob = await storageCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+        if (enhanceSharpness) {
+          applyCrispUnsharpPass(storageCtx, storageWidth, storageHeight, 0.22);
+        }
+        drawWatermarkOffscreen(storageCtx, storageWidth, storageHeight, watermark, false);
+      }
+    }
+
+    drawWatermarkOffscreen(hdCtx, hdWidth, hdHeight, watermark, Boolean(compactMode));
+
+    const hdBlob = await hdCanvas.convertToBlob({ type: 'image/jpeg', quality: compactMode ? 0.91 : 0.95 });
+    const hd600DpiDataUrl = await blobToDpi600DataUrl(hdBlob, 600);
+
+    let storageDataUrl = hd600DpiDataUrl;
+    if (!compactMode) {
+      if (storageCanvas) {
+        const storageBlob = await storageCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.93 });
         storageDataUrl = await blobToDpi600DataUrl(storageBlob, 600);
+      } else {
+        storageCanvas = new OffscreenCanvas(storageWidth, storageHeight);
+        const storageCtx = storageCanvas.getContext('2d', { alpha: false });
+        if (storageCtx) {
+          storageCtx.imageSmoothingEnabled = true;
+          storageCtx.imageSmoothingQuality = 'high';
+          storageCtx.drawImage(hdCanvas, 0, 0, storageWidth, storageHeight);
+          const storageBlob = await storageCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.93 });
+          storageDataUrl = await blobToDpi600DataUrl(storageBlob, 600);
+        }
       }
     }
 

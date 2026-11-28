@@ -75,6 +75,8 @@ export async function runPhotoEncodeInWorker(
     useSimulation?: boolean;
     defects?: DefectItem[];
     compactMode?: boolean;
+    enhanceLighting?: boolean;
+    enhanceSharpness?: boolean;
     watermark: PhotoEncodeWorkerRequest['watermark'];
   }
 ): Promise<{ hd600DpiDataUrl: string; storageDataUrl: string } | null> {
@@ -107,11 +109,13 @@ export async function runPhotoEncodeInWorker(
       bitmap: params.bitmap,
       useSimulation: params.useSimulation,
       defects: params.defects,
-      hdWidth: params.compactMode ? 1280 : PHOTO_3R_HD_WIDTH,
-      hdHeight: params.compactMode ? 896 : PHOTO_3R_HD_HEIGHT,
-      storageWidth: params.compactMode ? 1280 : PHOTO_3R_STORAGE_WIDTH,
-      storageHeight: params.compactMode ? 896 : PHOTO_3R_STORAGE_HEIGHT,
+      hdWidth: params.compactMode ? 1600 : PHOTO_3R_HD_WIDTH,
+      hdHeight: params.compactMode ? 1121 : PHOTO_3R_HD_HEIGHT,
+      storageWidth: params.compactMode ? 1600 : PHOTO_3R_STORAGE_WIDTH,
+      storageHeight: params.compactMode ? 1121 : PHOTO_3R_STORAGE_HEIGHT,
       compactMode: Boolean(params.compactMode),
+      enhanceLighting: params.enhanceLighting ?? true,
+      enhanceSharpness: params.enhanceSharpness ?? true,
       watermark: params.watermark,
     };
 
@@ -172,6 +176,43 @@ function yieldSmoothly(extraDelayMs = 0): Promise<void> {
   return yieldNextFrame();
 }
 
+function applyUnsharpMaskMainFallback(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  strength = 0.22
+) {
+  if (width > 2050 || height > 1450 || width < 16 || height < 16) return;
+  try {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const dst = imgData.data;
+    const src = new Uint8ClampedArray(dst);
+    const rowStride = width * 4;
+    for (let y = 1; y < height - 1; y++) {
+      const rowOffset = y * rowStride;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = rowOffset + x * 4;
+        for (let c = 0; c < 3; c++) {
+          const cur = src[idx + c];
+          const lap =
+            4 * cur -
+            src[idx - rowStride + c] -
+            src[idx + rowStride + c] -
+            src[idx - 4 + c] -
+            src[idx + 4 + c];
+          if (lap > 6 || lap < -6) {
+            const val = cur + lap * strength;
+            dst[idx + c] = val < 0 ? 0 : val > 255 ? 255 : val;
+          }
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {
+    // ignore memory limit
+  }
+}
+
 /**
  * Fallback non-blocking bila OffscreenCanvas Worker tidak tersedia:
  * Memecah render antar-frame dan memakai canvas.toBlob() asinkron agar frame video tetap berjalan.
@@ -181,12 +222,16 @@ export async function encodePhotoAsyncFallback(params: {
   drawFallbackSim: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
   watermark: PhotoEncodeWorkerRequest['watermark'];
   compactFallback?: boolean;
+  enhanceLighting?: boolean;
+  enhanceSharpness?: boolean;
 }): Promise<{ hd600DpiDataUrl: string; storageDataUrl: string }> {
-  const hdW = params.compactFallback ? 1280 : PHOTO_3R_HD_WIDTH;
-  const hdH = params.compactFallback ? 896 : PHOTO_3R_HD_HEIGHT;
-  const storageW = params.compactFallback ? 1280 : PHOTO_3R_STORAGE_WIDTH;
-  const storageH = params.compactFallback ? 896 : PHOTO_3R_STORAGE_HEIGHT;
-  const yieldMs = params.compactFallback ? 18 : 0;
+  const hdW = params.compactFallback ? 1600 : PHOTO_3R_HD_WIDTH;
+  const hdH = params.compactFallback ? 1121 : PHOTO_3R_HD_HEIGHT;
+  const storageW = params.compactFallback ? 1600 : PHOTO_3R_STORAGE_WIDTH;
+  const storageH = params.compactFallback ? 1121 : PHOTO_3R_STORAGE_HEIGHT;
+  const yieldMs = params.compactFallback ? 14 : 0;
+  const enhanceLight = params.enhanceLighting !== false;
+  const enhanceSharp = params.enhanceSharpness !== false;
 
   const hdCanvas = document.createElement('canvas');
   hdCanvas.width = hdW;
@@ -197,29 +242,29 @@ export async function encodePhotoAsyncFallback(params: {
   }
 
   if (params.source) {
-    drawImageCover3R(hdCtx, params.source, hdW, hdH);
+    const supportsFilter = 'filter' in hdCtx;
+    if (supportsFilter && (enhanceLight || enhanceSharp)) {
+      const parts: string[] = [];
+      if (enhanceLight) parts.push('brightness(1.07)', 'saturate(1.05)');
+      if (enhanceSharp) parts.push('contrast(1.09)');
+      hdCtx.filter = parts.join(' ');
+      drawImageCover3R(hdCtx, params.source, hdW, hdH);
+      hdCtx.filter = 'none';
+    } else {
+      drawImageCover3R(hdCtx, params.source, hdW, hdH);
+    }
+    if (enhanceSharp) {
+      applyUnsharpMaskMainFallback(hdCtx, hdW, hdH, 0.22);
+    }
   } else {
     params.drawFallbackSim(hdCtx, hdW, hdH);
   }
 
   await yieldSmoothly(yieldMs);
 
-  drawWatermark(hdCtx, hdW, hdH, params.watermark, {
-    fastNoBlur: Boolean(params.compactFallback),
-  });
+  let storageDataUrl = '';
 
-  await yieldSmoothly(yieldMs);
-
-  const hdBlob = await canvasToBlobAsync(hdCanvas, params.compactFallback ? 0.88 : 0.95);
-  const hdRaw = hdBlob
-    ? await blobToDataUrlAsync(hdBlob)
-    : hdCanvas.toDataURL('image/jpeg', params.compactFallback ? 0.88 : 0.95);
-  const hd600DpiDataUrl = patchJpegDpi600(hdRaw, 600);
-
-  let storageDataUrl = hd600DpiDataUrl;
-
-  if (!params.compactFallback && (storageW !== hdW || storageH !== hdH)) {
-    await yieldSmoothly(yieldMs);
+  if (params.source && !params.compactFallback && (storageW !== hdW || storageH !== hdH)) {
     const storageCanvas = document.createElement('canvas');
     storageCanvas.width = storageW;
     storageCanvas.height = storageH;
@@ -228,14 +273,54 @@ export async function encodePhotoAsyncFallback(params: {
       storageCtx.imageSmoothingEnabled = true;
       storageCtx.imageSmoothingQuality = 'high';
       storageCtx.drawImage(hdCanvas, 0, 0, storageW, storageH);
-      const storageBlob = await canvasToBlobAsync(storageCanvas, 0.88);
+      if (enhanceSharp) {
+        applyUnsharpMaskMainFallback(storageCtx, storageW, storageH, 0.22);
+      }
+      drawWatermark(storageCtx, storageW, storageH, params.watermark, { fastNoBlur: false });
+      const storageBlob = await canvasToBlobAsync(storageCanvas, 0.92);
       const storageRaw = storageBlob
         ? await blobToDataUrlAsync(storageBlob)
-        : storageCanvas.toDataURL('image/jpeg', 0.88);
+        : storageCanvas.toDataURL('image/jpeg', 0.92);
       storageDataUrl = patchJpegDpi600(storageRaw, 600);
     }
     storageCanvas.width = 0;
     storageCanvas.height = 0;
+    await yieldSmoothly(yieldMs);
+  }
+
+  drawWatermark(hdCtx, hdW, hdH, params.watermark, {
+    fastNoBlur: Boolean(params.compactFallback),
+  });
+
+  await yieldSmoothly(yieldMs);
+
+  const hdBlob = await canvasToBlobAsync(hdCanvas, params.compactFallback ? 0.91 : 0.95);
+  const hdRaw = hdBlob
+    ? await blobToDataUrlAsync(hdBlob)
+    : hdCanvas.toDataURL('image/jpeg', params.compactFallback ? 0.91 : 0.95);
+  const hd600DpiDataUrl = patchJpegDpi600(hdRaw, 600);
+
+  if (!storageDataUrl) {
+    if (!params.compactFallback && (storageW !== hdW || storageH !== hdH)) {
+      const storageCanvas = document.createElement('canvas');
+      storageCanvas.width = storageW;
+      storageCanvas.height = storageH;
+      const storageCtx = storageCanvas.getContext('2d', { alpha: false });
+      if (storageCtx) {
+        storageCtx.imageSmoothingEnabled = true;
+        storageCtx.imageSmoothingQuality = 'high';
+        storageCtx.drawImage(hdCanvas, 0, 0, storageW, storageH);
+        const storageBlob = await canvasToBlobAsync(storageCanvas, 0.92);
+        const storageRaw = storageBlob
+          ? await blobToDataUrlAsync(storageBlob)
+          : storageCanvas.toDataURL('image/jpeg', 0.92);
+        storageDataUrl = patchJpegDpi600(storageRaw, 600);
+      }
+      storageCanvas.width = 0;
+      storageCanvas.height = 0;
+    } else {
+      storageDataUrl = hd600DpiDataUrl;
+    }
   }
 
   hdCanvas.width = 0;

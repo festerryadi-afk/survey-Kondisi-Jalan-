@@ -64,7 +64,7 @@ export const AndroidCameraSettingsModal: React.FC<AndroidCameraSettingsModalProp
     {
       id: 'vehicle_stable',
       title: 'Stabil Kendaraan (720p · 30fps)',
-      subtitle: 'Kunci fokus jauh ke jalan, anti-drop FPS, crop anti-getar 6% aktif.',
+      subtitle: 'Fokus kontinu otomatis tajam ke jalan, pencahayaan +0.3 EV, anti-drop FPS.',
       badge: 'Disarankan',
     },
     {
@@ -290,6 +290,19 @@ export const AndroidCameraSettingsModal: React.FC<AndroidCameraSettingsModalProp
                   <button
                     type="button"
                     onClick={() =>
+                      onChangeSettings({ ...settings, focusMode: 'auto_continuous', focusDistance: null }, false)
+                    }
+                    className={`px-2 py-1.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                      settings.focusMode === 'auto_continuous'
+                        ? 'bg-sky-500/20 border-sky-500 text-sky-200'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Auto Kontinu (Tajam)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
                       onChangeSettings({ ...settings, focusMode: 'infinity_lock' }, false)
                     }
                     className={`px-2 py-1.5 rounded text-[11px] font-semibold border cursor-pointer ${
@@ -299,19 +312,6 @@ export const AndroidCameraSettingsModal: React.FC<AndroidCameraSettingsModalProp
                     }`}
                   >
                     Kunci Fokus Jauh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChangeSettings({ ...settings, focusMode: 'auto_continuous' }, false)
-                    }
-                    className={`px-2 py-1.5 rounded text-[11px] font-semibold border cursor-pointer ${
-                      settings.focusMode === 'auto_continuous'
-                        ? 'bg-sky-500/20 border-sky-500 text-sky-200'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Auto Kontinu
                   </button>
                 </div>
 
@@ -468,6 +468,34 @@ export const AndroidCameraSettingsModal: React.FC<AndroidCameraSettingsModalProp
                       onChangeSettings({ ...settings, keepScreenAwake: e.target.checked }, false)
                     }
                     className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-2 cursor-pointer">
+                  <span className="text-[11px] text-slate-200 font-medium">
+                    Optimasi Pencahayaan Jalan (Anti-Gelap)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.enhanceLighting}
+                    onChange={(e) =>
+                      onChangeSettings({ ...settings, enhanceLighting: e.target.checked }, false)
+                    }
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-2 cursor-pointer">
+                  <span className="text-[11px] text-slate-200 font-medium">
+                    Penajaman Hasil Foto &amp; Video (Sharpness HD)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.enhanceSharpness}
+                    onChange={(e) =>
+                      onChangeSettings({ ...settings, enhanceSharpness: e.target.checked }, false)
+                    }
+                    className="w-4 h-4 accent-sky-500 rounded cursor-pointer"
                   />
                 </label>
 

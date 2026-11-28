@@ -46,6 +46,10 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
   const [playableVideoUrl, setPlayableVideoUrl] = useState<string>('');
   const [isLoadingVideo, setIsLoadingVideo] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadFeedback, setDownloadFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -104,23 +108,41 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
   };
 
   const handleDownload = async () => {
+    setDownloadFeedback(null);
     if (photo) {
       setIsDownloading(true);
       try {
-        await downloadPhoto3R600DPI(
-          photo.imageUrl,
-          `DPUPR_MENTAWAI_3R_600DPI_Ruas${photo.nomorRuas}_${photo.staText}.jpg`,
-          photo.id
-        );
+        const fname = `DPUPR_MENTAWAI_3R_600DPI_Ruas${photo.nomorRuas}_${photo.staText}.jpg`;
+        await downloadPhoto3R600DPI(photo.imageUrl, fname, photo.id);
+        setDownloadFeedback({
+          type: 'success',
+          message: `Foto berhasil disiapkan: ${fname}`,
+        });
+      } catch (err) {
+        setDownloadFeedback({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Gagal mengunduh foto.',
+        });
       } finally {
         setIsDownloading(false);
       }
     } else if (video) {
       setIsDownloading(true);
       try {
-        await downloadSurveyVideo(video);
+        const res = await downloadSurveyVideo(video);
+        setDownloadFeedback({
+          type: 'success',
+          message: `Video tersimpan: ${res.location || res.filename}`,
+        });
       } catch (err) {
         console.error('Video download error:', err);
+        setDownloadFeedback({
+          type: 'error',
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Gagal mengunduh video survei. Periksa izin penyimpanan perangkat.',
+        });
       } finally {
         setIsDownloading(false);
       }
@@ -273,6 +295,33 @@ export const ViewMediaModal: React.FC<ViewMediaModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Download feedback banner */}
+        {downloadFeedback && (
+          <div
+            className={`px-3 sm:px-5 py-2 border-b text-xs flex items-center justify-between gap-2 ${
+              downloadFeedback.type === 'success'
+                ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+                : 'bg-rose-950/80 border-rose-500/40 text-rose-200'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              {downloadFeedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span className="break-all">{downloadFeedback.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDownloadFeedback(null)}
+              className="text-[11px] font-bold px-2 py-0.5 rounded bg-black/30 hover:bg-black/50 shrink-0 cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
 
         {/* Modal Content: Media Display + Metadata Panel */}
         <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-800">

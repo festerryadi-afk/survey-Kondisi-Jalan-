@@ -1,6 +1,5 @@
 import type { jsPDF } from 'jspdf';
 import { RuasJalan, SurveyPhoto } from '../types';
-import { formatMeterToSTA, getRuasSTASegments } from './pkrms';
 import { comparePhotosByStaAsc } from './geo';
 import { triggerBlobDownload } from './nativeDownload';
 
@@ -667,28 +666,6 @@ export async function exportGroupedReportPDF(
       y + 5.1
     );
     y += 10;
-
-    if (!isContinuation) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.6);
-      doc.setTextColor(51, 65, 85);
-      const staSegments = getRuasSTASegments(ruas);
-      const staSummaryText =
-        staSegments.length > 0
-          ? staSegments
-              .map(
-                (s) =>
-                  `${formatMeterToSTA(s.startSta)}-${formatMeterToSTA(s.endSta)}: ${s.tipePermukaan} (${s.kondisiJalan})`
-              )
-              .join('  |  ')
-          : 'Segmen per STA belum diatur';
-      const wrappedStaLines = (doc.splitTextToSize(
-        toPdfSafeText(`Permukaan & Kondisi per STA: ${staSummaryText}`),
-        contentWidth
-      ) as string[]).slice(0, 2);
-      doc.text(wrappedStaLines, marginX, y);
-      y += Math.max(4, wrappedStaLines.length * 3.4 + 1);
-    }
   };
 
   for (const ruas of targetRuasList) {

@@ -1,6 +1,6 @@
 import { DefectItem, SurveyVideo } from '../types';
 import { drawWatermark, formatSTA } from './geo';
-import { triggerBlobDownload } from './nativeDownload';
+import { triggerBlobDownloadAsync } from './nativeDownload';
 
 export interface StoredVideoEntry {
   blob: Blob;
@@ -129,12 +129,32 @@ export async function saveVideoBlobToStorage(
   const db = await openVideoDB();
   if (db) {
     try {
-      await new Promise<void>((resolve) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put({ blob, mimeType: cleanMime, extension }, videoId);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
+      const blobStored = await new Promise<boolean>((resolve) => {
+        try {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put({ blob, mimeType: cleanMime, extension }, videoId);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+          tx.onabort = () => resolve(false);
+        } catch {
+          resolve(false);
+        }
       });
+
+      // Fallback untuk Android 8.1 WebView lama yang menolak penyimpanan objek Blob langsung ke IndexedDB
+      if (!blobStored) {
+        const buffer = await blob.arrayBuffer();
+        await new Promise<void>((resolve) => {
+          try {
+            const tx2 = db.transaction(STORE_NAME, 'readwrite');
+            tx2.objectStore(STORE_NAME).put({ buffer, mimeType: cleanMime, extension }, videoId);
+            tx2.oncomplete = () => resolve();
+            tx2.onerror = () => resolve();
+          } catch {
+            resolve();
+          }
+        });
+      }
     } catch {
       // Ignore IndexedDB quota errors
     } finally {
@@ -181,20 +201,33 @@ export async function getStoredVideoEntry(videoId: string): Promise<StoredVideoE
   if (!db) return null;
 
   try {
-    const record = await new Promise<{ blob: Blob; mimeType?: string; extension?: string } | null>((resolve) => {
+    const record = await new Promise<{
+      blob?: Blob;
+      buffer?: ArrayBuffer;
+      mimeType?: string;
+      extension?: string;
+    } | null>((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).get(videoId);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
 
-    if (record && record.blob instanceof Blob && record.blob.size > 0) {
-      const mimeType = record.mimeType || record.blob.type || 'video/webm';
+    if (record) {
+      const mimeType = record.mimeType || (record.blob && record.blob.type) || 'video/webm';
       const extension = record.extension || resolveVideoExtension(mimeType);
-      const blobUrl = URL.createObjectURL(record.blob);
-      const entry: StoredVideoEntry = { blob: record.blob, blobUrl, mimeType, extension };
-      videoMemoryCache.set(videoId, entry);
-      return entry;
+      let resolvedBlob: Blob | null = null;
+      if (record.blob instanceof Blob && record.blob.size > 0) {
+        resolvedBlob = record.blob;
+      } else if (record.buffer instanceof ArrayBuffer && record.buffer.byteLength > 0) {
+        resolvedBlob = new Blob([record.buffer], { type: mimeType });
+      }
+      if (resolvedBlob && resolvedBlob.size > 0) {
+        const blobUrl = URL.createObjectURL(resolvedBlob);
+        const entry: StoredVideoEntry = { blob: resolvedBlob, blobUrl, mimeType, extension };
+        videoMemoryCache.set(videoId, entry);
+        return entry;
+      }
     }
   } catch {
     // ignore
@@ -234,7 +267,11 @@ function drawVideoSourceCoverFast(
   source: HTMLVideoElement,
   targetWidth: number,
   targetHeight: number,
-  stabilizeCrop = false
+  options: {
+    stabilizeCrop?: boolean;
+    enhanceLighting?: boolean;
+    enhanceSharpness?: boolean;
+  } = {}
 ) {
   const srcWidth = source.videoWidth || 1280;
   const srcHeight = source.videoHeight || 720;
@@ -242,7 +279,7 @@ function drawVideoSourceCoverFast(
 
   const srcRatio = srcWidth / srcHeight;
   const targetRatio = targetWidth / targetHeight;
-  const zoomScale = stabilizeCrop ? 1.06 : 1;
+  const zoomScale = options.stabilizeCrop ? 1.04 : 1;
 
   let drawW = targetWidth * zoomScale;
   let drawH = targetHeight * zoomScale;
@@ -261,8 +298,22 @@ function drawVideoSourceCoverFast(
   const offsetY = Math.round((targetHeight - intDrawH) / 2);
 
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'low';
-  ctx.drawImage(source, offsetX, offsetY, intDrawW, intDrawH);
+  ctx.imageSmoothingQuality = 'high';
+
+  const applyLight = options.enhanceLighting !== false;
+  const applySharpContrast = options.enhanceSharpness !== false;
+  const supportsFilter = 'filter' in ctx;
+
+  if (supportsFilter && (applyLight || applySharpContrast)) {
+    const parts: string[] = [];
+    if (applyLight) parts.push('brightness(1.06)', 'saturate(1.06)');
+    if (applySharpContrast) parts.push('contrast(1.09)');
+    ctx.filter = parts.join(' ');
+    ctx.drawImage(source, offsetX, offsetY, intDrawW, intDrawH);
+    ctx.filter = 'none';
+  } else {
+    ctx.drawImage(source, offsetX, offsetY, intDrawW, intDrawH);
+  }
 }
 
 /**
@@ -500,6 +551,7 @@ export class RoadSurveyRecorder {
   private getVideoEl: () => HTMLVideoElement | null;
   private isCameraActive: () => boolean;
   private getStabilizeCrop: () => boolean;
+  private getEnhanceVideo: () => { lighting: boolean; sharpness: boolean };
   private readonly targetFps: number;
   private readonly rafMinGapMs: number;
   private readonly videoBitsPerSecond: number;
@@ -509,6 +561,7 @@ export class RoadSurveyRecorder {
     getVideoEl: () => HTMLVideoElement | null;
     isCameraActive: () => boolean;
     getStabilizeCrop?: () => boolean;
+    getEnhanceVideo?: () => { lighting: boolean; sharpness: boolean };
     width?: number;
     height?: number;
     targetFps?: number;
@@ -527,6 +580,7 @@ export class RoadSurveyRecorder {
     this.getVideoEl = options.getVideoEl;
     this.isCameraActive = options.isCameraActive;
     this.getStabilizeCrop = options.getStabilizeCrop ?? (() => false);
+    this.getEnhanceVideo = options.getEnhanceVideo ?? (() => ({ lighting: true, sharpness: true }));
     const rawFps = options.targetFps ?? 30;
     // Selaraskan FPS ke pembagi 60Hz (30fps atau 20fps) agar bebas judder 2:3 pulldown di rAF
     this.targetFps = rawFps <= 20 ? 20 : 30;
@@ -609,7 +663,12 @@ export class RoadSurveyRecorder {
     const videoEl = this.getVideoEl();
 
     if (videoEl && this.isCameraActive() && videoEl.readyState >= 2) {
-      drawVideoSourceCoverFast(this.ctx, videoEl, w, h, this.getStabilizeCrop());
+      const enhance = this.getEnhanceVideo();
+      drawVideoSourceCoverFast(this.ctx, videoEl, w, h, {
+        stabilizeCrop: this.getStabilizeCrop(),
+        enhanceLighting: enhance.lighting,
+        enhanceSharpness: enhance.sharpness,
+      });
     } else {
       const stepSpeed = snap.speedKmh > 0 ? Math.max(3, snap.speedKmh) : 0;
       if (stepSpeed > 0) {
@@ -1089,7 +1148,7 @@ export async function downloadSurveyVideo(video: {
   startSta: number;
   endSta: number;
   thumbnailUrl?: string;
-}): Promise<{ filename: string }> {
+}): Promise<{ filename: string; location?: string }> {
   let entry = await getStoredVideoEntry(video.id);
 
   if (!entry && video.videoUrl) {
@@ -1118,8 +1177,11 @@ export async function downloadSurveyVideo(video: {
 
   if (entry) {
     const filename = `DPUPR_MENTAWAI_Video_Ruas${safeRuas}_STA${video.startSta}-${video.endSta}.${entry.extension}`;
-    triggerBlobDownload(entry.blob, filename);
-    return { filename };
+    const result = await triggerBlobDownloadAsync(entry.blob, filename);
+    if (!result.ok) {
+      throw new Error(result.error || 'Gagal menyimpan berkas video ke penyimpanan perangkat.');
+    }
+    return { filename, location: result.location };
   }
 
   throw new Error('Berkas video tidak tersedia untuk diunduh.');

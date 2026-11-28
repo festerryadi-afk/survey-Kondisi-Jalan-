@@ -7,6 +7,8 @@ import {
   Trash2,
   Upload,
   HardDrive,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { RuasJalan, SurveyVideo } from '../types';
 import { downloadSurveyVideo } from '../utils/videoRecorder';
@@ -36,14 +38,30 @@ export const VideoDocumentationView: React.FC<VideoDocumentationViewProps> = ({
   const [selectedRuasFilter, setSelectedRuasFilter] = useState<string>('all');
   const [confirmDeleteVideoId, setConfirmDeleteVideoId] = useState<string | null>(null);
   const [downloadingVideoId, setDownloadingVideoId] = useState<string | null>(null);
+  const [downloadFeedback, setDownloadFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const handleDownloadVideo = async (video: SurveyVideo, e: React.MouseEvent) => {
     e.stopPropagation();
     setDownloadingVideoId(video.id);
+    setDownloadFeedback(null);
     try {
-      await downloadSurveyVideo(video);
+      const res = await downloadSurveyVideo(video);
+      setDownloadFeedback({
+        type: 'success',
+        message: `Video berhasil disimpan: ${res.location || res.filename}`,
+      });
     } catch (err) {
       console.error('Video download error:', err);
+      setDownloadFeedback({
+        type: 'error',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Gagal mengunduh video survei. Periksa izin penyimpanan perangkat.',
+      });
     } finally {
       setDownloadingVideoId(null);
     }
@@ -125,6 +143,32 @@ export const VideoDocumentationView: React.FC<VideoDocumentationViewProps> = ({
             Total Arsip Video: {videos.length} File
           </div>
         </div>
+
+        {downloadFeedback && (
+          <div
+            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs ${
+              downloadFeedback.type === 'success'
+                ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-200'
+                : 'bg-rose-950/70 border-rose-500/40 text-rose-200'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              {downloadFeedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span className="break-all">{downloadFeedback.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDownloadFeedback(null)}
+              className="text-[11px] font-bold px-2 py-0.5 rounded bg-black/30 hover:bg-black/50 shrink-0 cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
 
         {/* Grouped Road Segments Video Section */}
         <div className="space-y-4 sm:space-y-6">

@@ -16,6 +16,8 @@ export interface AndroidCameraSettings {
   eisCropMargin: boolean;
   keepScreenAwake: boolean;
   hdPhotoCapture: boolean;
+  enhanceLighting: boolean;
+  enhanceSharpness: boolean;
 }
 
 export interface CameraDeviceOption {
@@ -44,22 +46,25 @@ export interface CameraHardwareCapabilities {
   actualFocusMode?: string;
 }
 
-const STORAGE_KEY = 'dpupr_android_camera_settings_v1';
+const LEGACY_STORAGE_KEY_V1 = 'dpupr_android_camera_settings_v1';
+const STORAGE_KEY = 'dpupr_android_camera_settings_v2';
 
 export const DEFAULT_ANDROID_CAMERA_SETTINGS: AndroidCameraSettings = {
   preset: 'vehicle_stable',
   deviceId: '',
   resolution: '720p',
   targetFps: 30,
-  focusMode: 'infinity_lock',
+  focusMode: 'auto_continuous',
   focusDistance: null,
   exposureLock: false,
-  exposureCompensation: 0,
+  exposureCompensation: 0.3,
   zoom: 1,
   torch: false,
   eisCropMargin: true,
   keepScreenAwake: true,
   hdPhotoCapture: true,
+  enhanceLighting: true,
+  enhanceSharpness: true,
 };
 
 export function getPresetCameraSettings(
@@ -77,9 +82,13 @@ export function getPresetCameraSettings(
       ...base,
       resolution: '720p',
       targetFps: 30,
-      focusMode: 'infinity_lock',
+      focusMode: 'auto_continuous',
+      focusDistance: null,
+      exposureCompensation: 0.3,
       eisCropMargin: true,
       keepScreenAwake: true,
+      enhanceLighting: true,
+      enhanceSharpness: true,
     };
   }
 
@@ -89,8 +98,12 @@ export function getPresetCameraSettings(
       resolution: '1080p',
       targetFps: 30,
       focusMode: 'auto_continuous',
+      focusDistance: null,
+      exposureCompensation: 0.3,
       eisCropMargin: false,
       keepScreenAwake: true,
+      enhanceLighting: true,
+      enhanceSharpness: true,
     };
   }
 
@@ -99,22 +112,49 @@ export function getPresetCameraSettings(
     ...base,
     resolution: '540p',
     targetFps: 24,
-    focusMode: 'infinity_lock',
+    focusMode: 'auto_continuous',
+    focusDistance: null,
+    exposureCompensation: 0.2,
     eisCropMargin: true,
     keepScreenAwake: true,
+    enhanceLighting: true,
+    enhanceSharpness: true,
   };
 }
 
 export function loadAndroidCameraSettings(): AndroidCameraSettings {
   if (typeof window === 'undefined') return DEFAULT_ANDROID_CAMERA_SETTINGS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_ANDROID_CAMERA_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<AndroidCameraSettings>;
-    return {
-      ...DEFAULT_ANDROID_CAMERA_SETTINGS,
-      ...parsed,
-    };
+    const rawV2 = localStorage.getItem(STORAGE_KEY);
+    if (rawV2) {
+      const parsed = JSON.parse(rawV2) as Partial<AndroidCameraSettings>;
+      return {
+        ...DEFAULT_ANDROID_CAMERA_SETTINGS,
+        ...parsed,
+      };
+    }
+
+    const rawV1 = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
+    if (rawV1) {
+      const parsedV1 = JSON.parse(rawV1) as Partial<AndroidCameraSettings>;
+      const migratedFocusMode: AndroidFocusPreference =
+        parsedV1.focusMode === 'infinity_lock' && parsedV1.focusDistance == null
+          ? 'auto_continuous'
+          : (parsedV1.focusMode ?? 'auto_continuous');
+      const migrated: AndroidCameraSettings = {
+        ...DEFAULT_ANDROID_CAMERA_SETTINGS,
+        ...parsedV1,
+        focusMode: migratedFocusMode,
+        exposureCompensation:
+          typeof parsedV1.exposureCompensation === 'number' && parsedV1.exposureCompensation !== 0
+            ? parsedV1.exposureCompensation
+            : DEFAULT_ANDROID_CAMERA_SETTINGS.exposureCompensation,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+
+    return DEFAULT_ANDROID_CAMERA_SETTINGS;
   } catch {
     return DEFAULT_ANDROID_CAMERA_SETTINGS;
   }
@@ -238,6 +278,9 @@ type ExtendedCapabilities = MediaTrackCapabilities & {
   zoom?: { min?: number; max?: number; step?: number };
   torch?: boolean;
   whiteBalanceMode?: string[];
+  sharpness?: { min?: number; max?: number; step?: number };
+  contrast?: { min?: number; max?: number; step?: number };
+  brightness?: { min?: number; max?: number; step?: number };
 };
 
 type ExtendedSettings = MediaTrackSettings & {
@@ -305,24 +348,40 @@ export async function applyAndroidCameraTrackSettings(
 
   const advancedSteps: Record<string, unknown>[] = [];
 
-  // 1. Focus mode + far road focus distance (untuk mencegah fokus berburu saat kendaraan bergerak)
+  // 1. Focus mode:
+  // Catatan Camera2 Android (termasuk Vivo Y93 Android 8.1): focusDistance sering memakai satuan diopter
+  // (0 = tak terhingga, max = jarak dekat/makro). Memaksa focusDistance=max membuat jalan buram!
+  // Gunakan 'continuous' AF sebagai standar utama atau 'single-shot' / focusDistance manual bila disetel user.
   if (settings.focusMode === 'infinity_lock') {
-    if (caps.focusModes.includes('manual') && caps.focusDistanceRange) {
-      const targetDist =
-        typeof settings.focusDistance === 'number'
-          ? Math.min(caps.focusDistanceRange.max, Math.max(caps.focusDistanceRange.min, settings.focusDistance))
-          : Math.min(caps.focusDistanceRange.max, Math.max(caps.focusDistanceRange.min, caps.focusDistanceRange.max));
+    if (
+      typeof settings.focusDistance === 'number' &&
+      caps.focusModes.includes('manual') &&
+      caps.focusDistanceRange
+    ) {
+      const targetDist = Math.min(
+        caps.focusDistanceRange.max,
+        Math.max(caps.focusDistanceRange.min, settings.focusDistance)
+      );
       advancedSteps.push({ focusMode: 'manual', focusDistance: targetDist });
     } else if (caps.focusModes.includes('single-shot')) {
       advancedSteps.push({ focusMode: 'single-shot' });
+    } else if (
+      caps.focusModes.includes('manual') &&
+      caps.focusDistanceRange &&
+      caps.focusDistanceRange.min === 0
+    ) {
+      // Pada skala diopter Android, 0.0 adalah fokus jauh/tak terhingga
+      advancedSteps.push({ focusMode: 'manual', focusDistance: 0 });
     } else if (caps.focusModes.includes('continuous')) {
       advancedSteps.push({ focusMode: 'continuous' });
     }
   } else if (caps.focusModes.includes('continuous')) {
     advancedSteps.push({ focusMode: 'continuous' });
+  } else if (caps.focusModes.includes('single-shot')) {
+    advancedSteps.push({ focusMode: 'single-shot' });
   }
 
-  // 2. Exposure mode & compensation
+  // 2. Exposure mode & compensation (mencegah aspal jalan gelap akibat backlight langit)
   if (settings.exposureLock && caps.exposureModes.includes('manual')) {
     advancedSteps.push({ exposureMode: 'manual' });
   } else if (!settings.exposureLock && caps.exposureModes.includes('continuous')) {
@@ -330,9 +389,12 @@ export async function applyAndroidCameraTrackSettings(
   }
 
   if (caps.exposureCompRange) {
+    const desiredEv = settings.enhanceLighting
+      ? settings.exposureCompensation
+      : Math.min(0, settings.exposureCompensation);
     const clampedEv = Math.min(
       caps.exposureCompRange.max,
-      Math.max(caps.exposureCompRange.min, settings.exposureCompensation)
+      Math.max(caps.exposureCompRange.min, desiredEv)
     );
     advancedSteps.push({ exposureCompensation: clampedEv });
   }
@@ -342,7 +404,14 @@ export async function applyAndroidCameraTrackSettings(
     advancedSteps.push({ whiteBalanceMode: 'continuous' });
   }
 
-  // 4. Hardware Zoom
+  // 4. Hardware sharpness boost ringan bila didukung driver kamera Android
+  const sharpnessRange = toRange(rawCaps.sharpness);
+  if (sharpnessRange && settings.enhanceSharpness) {
+    const midSharpness = sharpnessRange.min + (sharpnessRange.max - sharpnessRange.min) * 0.65;
+    advancedSteps.push({ sharpness: midSharpness });
+  }
+
+  // 5. Hardware Zoom
   if (caps.zoomRange) {
     const clampedZoom = Math.min(
       caps.zoomRange.max,
@@ -351,7 +420,7 @@ export async function applyAndroidCameraTrackSettings(
     advancedSteps.push({ zoom: clampedZoom });
   }
 
-  // 5. Torch / Flash
+  // 6. Torch / Flash
   if (caps.hasTorch) {
     advancedSteps.push({ torch: settings.torch });
   }
@@ -483,4 +552,3 @@ export async function captureHighResStillSource(
     return fallback;
   }
 }
-
